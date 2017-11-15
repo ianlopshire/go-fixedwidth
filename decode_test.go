@@ -1,10 +1,43 @@
 package fixedwidth_test
 
 import (
-	"github.com/ianlopshire/go-fixedwidth"
+	"fmt"
+	"log"
 	"reflect"
 	"testing"
+
+	"github.com/ianlopshire/go-fixedwidth"
 )
+
+func ExampleUnmarshal() {
+	// Define some fixed-with data to parse
+	data := []byte("" +
+		"1         Ian                 Lopshire" + "\n" +
+		"2         John                Doe" + "\n" +
+		"3         Jane                Doe" + "\n")
+
+	// Define the format as a struct.
+	// The fixed start and end position are defined via struct tags: `fixed:"{startPos},{endPos}"`.
+	// Positions start at 1, the the interval is inclusive.
+	var people []struct {
+		ID        int    `fixed:"1,10"`
+		FirstName string `fixed:"11,30"`
+		LastName  string `fixed:"31,50"`
+	}
+
+	err := fixedwidth.Unmarshal(data, &people)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Printf("%+v\n", people[0])
+	fmt.Printf("%+v\n", people[1])
+	fmt.Printf("%+v\n", people[2])
+	// Output:
+	// {ID:1 FirstName:Ian LastName:Lopshire}
+	// {ID:2 FirstName:John LastName:Doe}
+	// {ID:3 FirstName:Jane LastName:Doe}
+}
 
 // str is a string that implements the encoding.TextUnmarshaler interface.
 // This is useful for testing.
