@@ -33,7 +33,7 @@ func TestUnmarshal(t *testing.T) {
 	}{
 		{
 			name:     "Basic Slice Case",
-			rawValue: []byte("  foo  123  1.2  bar" + "\n" + "  bar  321  2.1  foo"),
+			rawValue: []byte("foo  123  1.2  bar" + "\n" + "bar  321  2.1  foo"),
 			target:   &[]allTypes{},
 			expected: &[]allTypes{
 				{"foo", 123, 1.2, "bar"},
@@ -43,7 +43,7 @@ func TestUnmarshal(t *testing.T) {
 		},
 		{
 			name:      "Basic Struct Case",
-			rawValue:  []byte("  foo  123  1.2  bar"),
+			rawValue:  []byte("foo  123  1.2  bar"),
 			target:    &allTypes{},
 			expected:  &allTypes{"foo", 123, 1.2, "bar"},
 			shouldErr: false,

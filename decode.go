@@ -161,7 +161,7 @@ func getRawValue(line []byte, startPos, endPos int) []byte {
 	if endPos > len(line) {
 		endPos = len(line)
 	}
-	return bytes.TrimLeftFunc(line[startPos-1:endPos], unicode.IsSpace)
+	return bytes.TrimRightFunc(line[startPos-1:endPos], unicode.IsSpace)
 }
 
 func setString(fv reflect.Value, rawValue []byte) bool {
