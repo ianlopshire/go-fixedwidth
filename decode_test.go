@@ -18,7 +18,7 @@ func ExampleUnmarshal() {
 
 	// Define the format as a struct.
 	// The fixed start and end position are defined via struct tags: `fixed:"{startPos},{endPos}"`.
-	// Positions start at 1. The the interval is inclusive.
+	// Positions start at 1. The interval is inclusive.
 	var people []struct {
 		ID        int    `fixed:"1,10"`
 		FirstName string `fixed:"11,30"`
