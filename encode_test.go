@@ -10,6 +10,7 @@ import (
 )
 
 func ExampleMarshal() {
+	// define some data to encode
 	people := []struct {
 		ID        int     `fixed:"1,5"`
 		FirstName string  `fixed:"6,15"`
