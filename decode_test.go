@@ -1,31 +1,29 @@
-package fixedwidth_test
+package fixedwidth
 
 import (
 	"fmt"
 	"log"
 	"reflect"
 	"testing"
-
-	"github.com/ianlopshire/go-fixedwidth"
 )
 
 func ExampleUnmarshal() {
-	// Define some fixed-with data to parse
-	data := []byte("" +
-		"1         Ian                 Lopshire" + "\n" +
-		"2         John                Doe" + "\n" +
-		"3         Jane                Doe" + "\n")
-
-	// Define the format as a struct.
-	// The fixed start and end position are defined via struct tags: `fixed:"{startPos},{endPos}"`.
-	// Positions start at 1. The interval is inclusive.
+	// define the format
 	var people []struct {
-		ID        int    `fixed:"1,10"`
-		FirstName string `fixed:"11,30"`
-		LastName  string `fixed:"31,50"`
+		ID        int     `fixed:"1,5"`
+		FirstName string  `fixed:"6,15"`
+		LastName  string  `fixed:"16,25"`
+		Grade     float64 `fixed:"26,30"`
 	}
 
-	err := fixedwidth.Unmarshal(data, &people)
+	// define some fixed-with data to parse
+	data := []byte("" +
+		"1    Ian       Lopshire  99.50" + "\n" +
+		"2    John      Doe       89.50" + "\n" +
+		"3    Jane      Doe       79.50" + "\n")
+
+
+	err := Unmarshal(data, &people)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -34,28 +32,18 @@ func ExampleUnmarshal() {
 	fmt.Printf("%+v\n", people[1])
 	fmt.Printf("%+v\n", people[2])
 	// Output:
-	// {ID:1 FirstName:Ian LastName:Lopshire}
-	// {ID:2 FirstName:John LastName:Doe}
-	// {ID:3 FirstName:Jane LastName:Doe}
-}
-
-// str is a string that implements the encoding.TextUnmarshaler interface.
-// This is useful for testing.
-type str string
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *str) UnmarshalText(text []byte) error {
-	*s = str(text)
-	return nil
+	//{ID:1 FirstName:Ian LastName:Lopshire Grade:99.5}
+	//{ID:2 FirstName:John LastName:Doe Grade:89.5}
+	//{ID:3 FirstName:Jane LastName:Doe Grade:79.5}
 }
 
 func TestUnmarshal(t *testing.T) {
 	// allTypes contains a field with all current supported types.
 	type allTypes struct {
-		String          string  `fixed:"1,5"`
-		Int             int     `fixed:"6,10"`
-		Float           float64 `fixed:"11,15"`
-		TextUnmarshaler str     `fixed:"16,20"` // test encoding.TextUnmarshaler functionality
+		String          string                     `fixed:"1,5"`
+		Int             int                        `fixed:"6,10"`
+		Float           float64                    `fixed:"11,15"`
+		TextUnmarshaler EncodableString `fixed:"16,20"` // test encoding.TextUnmarshaler functionality
 	}
 	for _, tt := range []struct {
 		name      string
@@ -69,8 +57,8 @@ func TestUnmarshal(t *testing.T) {
 			rawValue: []byte("foo  123  1.2  bar" + "\n" + "bar  321  2.1  foo"),
 			target:   &[]allTypes{},
 			expected: &[]allTypes{
-				{"foo", 123, 1.2, "bar"},
-				{"bar", 321, 2.1, "foo"},
+				{"foo", 123, 1.2, EncodableString{"bar", nil}},
+				{"bar", 321, 2.1, EncodableString{"foo", nil}},
 			},
 			shouldErr: false,
 		},
@@ -78,12 +66,12 @@ func TestUnmarshal(t *testing.T) {
 			name:      "Basic Struct Case",
 			rawValue:  []byte("foo  123  1.2  bar"),
 			target:    &allTypes{},
-			expected:  &allTypes{"foo", 123, 1.2, "bar"},
+			expected:  &allTypes{"foo", 123, 1.2, EncodableString{"bar", nil}},
 			shouldErr: false,
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			err := fixedwidth.Unmarshal(tt.rawValue, tt.target)
+			err := Unmarshal(tt.rawValue, tt.target)
 			if tt.shouldErr != (err != nil) {
 				t.Errorf("Unmarshal() err want %v, have %v (%v)", tt.shouldErr, err != nil, err)
 			}
@@ -107,7 +95,7 @@ func TestUnmarshal(t *testing.T) {
 			{"Valid Unmarshal struct", &struct{}{}, false},
 		} {
 			t.Run(tt.name, func(t *testing.T) {
-				err := fixedwidth.Unmarshal([]byte{}, tt.v)
+				err := Unmarshal([]byte{}, tt.v)
 				if tt.shouldErr != (err != nil) {
 					t.Errorf("Unmarshal() err want %v, have %v (%v)", tt.shouldErr, err != nil, err)
 				}

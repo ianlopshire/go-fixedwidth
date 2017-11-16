@@ -6,20 +6,20 @@ Package fixedwidth provides encoding and decoding for fixed-width formatted Data
 
 ## Decode
 ```go
-// Define some fixed-with data to parse
-data := []byte("" +
-    "1         Ian                 Lopshire" + "\n" +
-    "2         John                Doe" + "\n" +
-    "3         Jane                Doe" + "\n")
-
-// Define the format as a struct.
-// The fixed start and end position are defined via struct tags: `fixed:"{startPos},{endPos}"`.
-// Positions start at 1. The interval is inclusive.
+// define the format
 var people []struct {
-    ID        int    `fixed:"1,10"`
-    FirstName string `fixed:"11,30"`
-    LastName  string `fixed:"31,50"`
+    ID        int     `fixed:"1,5"`
+    FirstName string  `fixed:"6,15"`
+    LastName  string  `fixed:"16,25"`
+    Grade     float64 `fixed:"26,30"`
 }
+
+// define some fixed-with data to parse
+data := []byte("" +
+    "1    Ian       Lopshire  99.50" + "\n" +
+    "2    John      Doe       89.50" + "\n" +
+    "3    Jane      Doe       79.50" + "\n")
+
 
 err := fixedwidth.Unmarshal(data, &people)
 if err != nil {
@@ -30,9 +30,9 @@ fmt.Printf("%+v\n", people[0])
 fmt.Printf("%+v\n", people[1])
 fmt.Printf("%+v\n", people[2])
 // Output:
-// {ID:1 FirstName:Ian LastName:Lopshire}
-// {ID:2 FirstName:John LastName:Doe}
-// {ID:3 FirstName:Jane LastName:Doe}
+//{ID:1 FirstName:Ian LastName:Lopshire Grade:99.5}
+//{ID:2 FirstName:John LastName:Doe Grade:89.5}
+//{ID:3 FirstName:Jane LastName:Doe Grade:79.5}
 ```
 
 ## Licence

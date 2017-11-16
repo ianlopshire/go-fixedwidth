@@ -74,7 +74,7 @@ func (e *UnmarshalTypeError) Error() string {
 //
 // In the case that v points to a slice value, Decode will read until
 // the end of its input.
-func (d *Decoder) Decode(v interface{}) (err error) {
+func (d *Decoder) Decode(v interface{}) (error) {
 	rv := reflect.ValueOf(v)
 	if rv.Kind() != reflect.Ptr || rv.IsNil() {
 		return &InvalidUnmarshalError{reflect.TypeOf(v)}
