@@ -22,7 +22,6 @@ func ExampleUnmarshal() {
 		"2    John      Doe       89.50" + "\n" +
 		"3    Jane      Doe       79.50" + "\n")
 
-
 	err := Unmarshal(data, &people)
 	if err != nil {
 		log.Fatal(err)
@@ -40,9 +39,9 @@ func ExampleUnmarshal() {
 func TestUnmarshal(t *testing.T) {
 	// allTypes contains a field with all current supported types.
 	type allTypes struct {
-		String          string                     `fixed:"1,5"`
-		Int             int                        `fixed:"6,10"`
-		Float           float64                    `fixed:"11,15"`
+		String          string          `fixed:"1,5"`
+		Int             int             `fixed:"6,10"`
+		Float           float64         `fixed:"11,15"`
 		TextUnmarshaler EncodableString `fixed:"16,20"` // test encoding.TextUnmarshaler functionality
 	}
 	for _, tt := range []struct {
