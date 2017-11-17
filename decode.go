@@ -14,10 +14,7 @@ import (
 // result in the value pointed to by v. If v is nil or not a
 // pointer, Unmarshal returns an InvalidUnmarshalError.
 func Unmarshal(data []byte, v interface{}) error {
-	d := Decoder{
-		data: bufio.NewReader(bytes.NewReader(data)),
-	}
-	return d.Decode(v)
+	return NewDecoder(bytes.NewReader(data)).Decode(v)
 }
 
 // A Decoder reads and decodes fixed width data from an input stream.
