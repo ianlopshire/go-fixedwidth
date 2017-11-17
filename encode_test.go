@@ -35,18 +35,18 @@ func TestMarshal(t *testing.T) {
 		F2 interface{} `fixed:"6,10"`
 	}
 	tagHelper := struct {
-		Valid string `fixed:"1,5"`
-		NoTags string
+		Valid       string `fixed:"1,5"`
+		NoTags      string
 		InvalidTags string `fixed:"5"`
 	}{"foo", "foo", "foo"}
 	marshalError := errors.New("marshal error")
 
-	for _, tt := range []struct{
-		name string
-		i interface{}
-		o []byte
+	for _, tt := range []struct {
+		name      string
+		i         interface{}
+		o         []byte
 		shouldErr bool
-	} {
+	}{
 		{"single line", H{"foo", 1}, []byte("foo  1    "), false},
 		{"multiple line", []H{{"foo", 1}, {"bar", 2}}, []byte("foo  1    \nbar  2    "), false},
 		{"empty slice", []H{}, nil, false},
@@ -57,7 +57,7 @@ func TestMarshal(t *testing.T) {
 		{"marshal error", EncodableString{"", marshalError}, nil, true},
 		{"invalid tags", tagHelper, []byte("foo  "), false},
 	} {
-		t.Run(tt.name, func(t *testing.T){
+		t.Run(tt.name, func(t *testing.T) {
 			o, err := Marshal(tt.i)
 			if tt.shouldErr != (err != nil) {
 				t.Errorf("Marshal() shouldErr expected %v, have %v (%v)", tt.shouldErr, err != nil, err)
