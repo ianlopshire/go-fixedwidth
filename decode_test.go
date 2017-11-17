@@ -68,13 +68,34 @@ func TestUnmarshal(t *testing.T) {
 			expected:  &allTypes{"foo", 123, 1.2, EncodableString{"bar", nil}},
 			shouldErr: false,
 		},
+		{
+			name:      "Unmarshal Error",
+			rawValue:  []byte("foo  nan  ddd  bar"),
+			target:    &allTypes{},
+			expected:  &allTypes{},
+			shouldErr: true,
+		},
+		{
+			name:      "Empty Line",
+			rawValue:  []byte(""),
+			target:    &allTypes{},
+			expected:  &allTypes{"", 0, 0, EncodableString{"", nil}},
+			shouldErr: false,
+		},
+		{
+			name:      "Invalid Target",
+			rawValue:  []byte("foo  123  1.2  bar"),
+			target:    allTypes{},
+			expected:  allTypes{},
+			shouldErr: true,
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			err := Unmarshal(tt.rawValue, tt.target)
 			if tt.shouldErr != (err != nil) {
 				t.Errorf("Unmarshal() err want %v, have %v (%v)", tt.shouldErr, err != nil, err)
 			}
-			if !reflect.DeepEqual(tt.target, tt.expected) {
+			if !tt.shouldErr && !reflect.DeepEqual(tt.target, tt.expected) {
 				t.Errorf("Unmarshal() want %+v, have %+v", tt.target, tt.expected)
 			}
 
