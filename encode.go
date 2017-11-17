@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"encoding"
-	"github.com/pkg/errors"
 	"io"
 	"reflect"
 	"strconv"
@@ -46,6 +45,15 @@ func Marshal(v interface{}) ([]byte, error) {
 	return buff.Bytes(), nil
 }
 
+// MarshalInvalidTypeError describes an invalid type being marshaled.
+type MarshalInvalidTypeError struct {
+	typeName string
+}
+
+func (e *MarshalInvalidTypeError) Error() string {
+	return "fixedwidth: cannot marshal unknown Type " + e.typeName
+}
+
 // An Encoder writes fixed-width formatted data to an output
 // stream.
 type Encoder struct {
@@ -64,6 +72,10 @@ func NewEncoder(w io.Writer) *Encoder {
 // See the documentation for Marshal for details about
 // encoding behavior.
 func (e *Encoder) Encode(i interface{}) (err error) {
+	if i == nil {
+		return nil
+	}
+
 	// check to see if i should be encoded into multiple lines
 	v := reflect.ValueOf(i)
 	for v.Kind() == reflect.Ptr || v.Kind() == reflect.Interface {
@@ -119,8 +131,8 @@ func newValueEncoder(t reflect.Type) valueEncoder {
 	}
 
 	switch t.Kind() {
-	case reflect.Ptr:
-		return ptrEncoder
+	case reflect.Ptr, reflect.Interface:
+		return ptrIterfaceEncoder
 	case reflect.Struct:
 		return structEncoder
 	case reflect.String:
@@ -184,7 +196,7 @@ func textMarshalerEncoder(v reflect.Value) ([]byte, error) {
 	return v.Interface().(encoding.TextMarshaler).MarshalText()
 }
 
-func ptrEncoder(v reflect.Value) ([]byte, error) {
+func ptrIterfaceEncoder(v reflect.Value) ([]byte, error) {
 	if v.IsNil() {
 		return nilEncoder(v)
 	}
@@ -211,6 +223,6 @@ func nilEncoder(v reflect.Value) ([]byte, error) {
 
 func unknownTypeEncoder(t reflect.Type) valueEncoder {
 	return func(value reflect.Value) ([]byte, error) {
-		return nil, errors.Errorf("fixedwidth: cannot encode unknown Type %s", t.Name())
+		return nil, &MarshalInvalidTypeError{typeName: t.Name()}
 	}
 }
