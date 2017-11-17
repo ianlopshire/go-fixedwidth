@@ -132,7 +132,7 @@ func newValueEncoder(t reflect.Type) valueEncoder {
 
 	switch t.Kind() {
 	case reflect.Ptr, reflect.Interface:
-		return ptrIterfaceEncoder
+		return ptrInterfaceEncoder
 	case reflect.Struct:
 		return structEncoder
 	case reflect.String:
@@ -196,7 +196,7 @@ func textMarshalerEncoder(v reflect.Value) ([]byte, error) {
 	return v.Interface().(encoding.TextMarshaler).MarshalText()
 }
 
-func ptrIterfaceEncoder(v reflect.Value) ([]byte, error) {
+func ptrInterfaceEncoder(v reflect.Value) ([]byte, error) {
 	if v.IsNil() {
 		return nilEncoder(v)
 	}
