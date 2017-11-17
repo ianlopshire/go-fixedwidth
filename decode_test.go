@@ -5,6 +5,7 @@ import (
 	"log"
 	"reflect"
 	"testing"
+	"encoding"
 )
 
 func ExampleUnmarshal() {
@@ -42,7 +43,7 @@ func TestUnmarshal(t *testing.T) {
 		String          string          `fixed:"1,5"`
 		Int             int             `fixed:"6,10"`
 		Float           float64         `fixed:"11,15"`
-		TextUnmarshaler EncodableString `fixed:"16,20"` // test encoding.TextUnmarshaler functionality
+		TextUnmarshaler EncodableString `fixed:"16,20"`
 	}
 	for _, tt := range []struct {
 		name      string
@@ -93,10 +94,10 @@ func TestUnmarshal(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := Unmarshal(tt.rawValue, tt.target)
 			if tt.shouldErr != (err != nil) {
-				t.Errorf("Unmarshal() err want %v, have %v (%v)", tt.shouldErr, err != nil, err)
+				t.Errorf("Unmarshal() err want %v, have %v (%v)", tt.shouldErr, err != nil, err.Error())
 			}
 			if !tt.shouldErr && !reflect.DeepEqual(tt.target, tt.expected) {
-				t.Errorf("Unmarshal() want %+v, have %+v", tt.target, tt.expected)
+				t.Errorf("Unmarshal() want %+v, have %+v", tt.expected, tt.target)
 			}
 
 		})
@@ -122,4 +123,63 @@ func TestUnmarshal(t *testing.T) {
 			})
 		}
 	})
+}
+
+func TestNewValueSetter(t *testing.T) {
+	for _, tt := range []struct {
+		name      string
+		raw       []byte
+		expected  interface{}
+		shouldErr bool
+	}{
+		{"invalid type", []byte("foo"), true, true},
+
+		{"textUnmarshaler implementation", []byte("foo"), &EncodableString{"foo", nil}, false},
+		{"textUnmarshaler implementation if addressed", []byte("foo"), EncodableString{"foo", nil}, false},
+		{"textUnmarshaler implementation as interface", []byte("foo"), encoding.TextUnmarshaler(&EncodableString{"foo", nil}), false},
+		{"textUnmarshaler implementation in interface", []byte("foo"), interface{}(&EncodableString{"foo", nil}), false},
+		{"textUnmarshaler implementation if addressed in interface", []byte("foo"), interface{}(EncodableString{"foo", nil}), false},
+
+		{"string", []byte("foo"), string("foo"), false},
+		{"string empty", []byte(""), string(""), false},
+		{"string interface", []byte("foo"), interface{}(string("foo")), false},
+		{"string interface empty", []byte(""), interface{}(string("")), false},
+		{"*string", []byte("foo"), stringp("foo"), false},
+		{"*string empty", []byte(""), (*string)(nil), false},
+
+		{"int", []byte("1"), int(1), false},
+		{"int zero", []byte("0"), int(0), false},
+		{"int empty", []byte(""), int(0), false},
+		{"*int", []byte("1"), intp(1), false},
+		{"*int zero", []byte("0"), intp(0), false},
+		{"*int empty", []byte(""), (*int)(nil), false},
+		{"int Invalid", []byte("foo"), int(0), true},
+
+		{"float64", []byte("1.23"), float64(1.23), false},
+		{"*float64", []byte("1.23"), float64p(1.23), false},
+		{"*float64 zero", []byte("0"), float64p(0), false},
+		{"*float64 empty", []byte(""), (*float64)(nil), false},
+		{"float64 Invalid", []byte("foo"), float64(0), true},
+
+		{"float32", []byte("1.23"), float32(1.23), false},
+		{"float32 Invalid", []byte("foo"), float32(0), true},
+
+		{"int8", []byte("1"), int8(1), false},
+		{"int16", []byte("1"), int16(1), false},
+		{"int32", []byte("1"), int32(1), false},
+		{"int64", []byte("1"), int64(1), false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			// ensure we have an addressable target
+			var i = reflect.Indirect(reflect.New(reflect.TypeOf(tt.expected)))
+
+			err := newValueSetter(i.Type())(i, tt.raw)
+			if tt.shouldErr != (err != nil) {
+				t.Errorf("newValueSetter(%s)() err want %v, have %v (%v)", reflect.TypeOf(tt.expected).Name(), tt.shouldErr, err != nil, err.Error())
+			}
+			if !tt.shouldErr && !reflect.DeepEqual(tt.expected, i.Interface()) {
+				t.Errorf("newValueSetter(%s)() want %s, have %s", reflect.TypeOf(tt.expected).Name(), tt.expected, i)
+			}
+		})
+	}
 }
