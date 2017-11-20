@@ -9,7 +9,7 @@ import (
 	"strconv"
 )
 
-// Marshal returns the JSON encoding of v.
+// Marshal returns the fixed-width encoding of v.
 //
 // v must be an encodable type or a slice of an encodable
 // type. If v is a slice, each item will be treated as a
