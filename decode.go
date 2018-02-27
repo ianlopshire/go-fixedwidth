@@ -8,7 +8,6 @@ import (
 	"io"
 	"reflect"
 	"strconv"
-	"unicode"
 )
 
 // Unmarshal parses the fixed width encoded data and stores the
@@ -127,7 +126,7 @@ func rawValueFromLine(line []byte, startPos, endPos int) []byte {
 	if endPos > len(line) {
 		endPos = len(line)
 	}
-	return bytes.TrimRightFunc(line[startPos-1:endPos], unicode.IsSpace)
+	return bytes.TrimSpace(line[startPos-1:endPos])
 }
 
 type valueSetter func(v reflect.Value, raw []byte) error
