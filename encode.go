@@ -16,26 +16,26 @@ import (
 // line. If v is a single encodable type, a single line
 // will be encoded.
 //
-// In order fot a type to be encodable, it must implement
-// the encoding.TextMarshaler interface or be base on one
+// In order for a type to be encodable, it must implement
+// the encoding.TextMarshaler interface or be based on one
 // of the following builtin types: string, int, int64,
 // int32, int16, int8, float64, float32, or struct.
 // Pointers to encodable types and interfaces containing
 // encodable types are also encodable.
 //
-// nil pointers and interface will be omitted. zero vales
+// nil pointers and interfaces will be omitted. zero vales
 // will be encoded normally.
 //
-// A struct is be encoded to a single slice of bytes. Each
+// A struct is encoded to a single slice of bytes. Each
 // field in a struct will be encoded and placed at the
 // position defined by its struct tags. The tags should be
 // formatted as `fixed:"{startPos},{endPos}"`. Positions
 // start at 1. The interval is inclusive. Fields without
-// tags and Fields or an un-encodable type are ignored.
+// tags and Fields of an un-encodable type are ignored.
 //
-// If the encoded value of a field is longer than what is
-// allowed by the fields position interval, the overflow is
-// ignored.
+// If the encoded value of a field is longer than the
+// length of the position interval, the overflow is
+// truncated.
 func Marshal(v interface{}) ([]byte, error) {
 	buff := bytes.NewBuffer(nil)
 	err := NewEncoder(buff).Encode(v)

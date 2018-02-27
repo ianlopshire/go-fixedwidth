@@ -10,7 +10,7 @@ import (
 	"strconv"
 )
 
-// Unmarshal parses the fixed width encoded data and stores the
+// Unmarshal parses fixed width encoded data and stores the
 // result in the value pointed to by v. If v is nil or not a
 // pointer, Unmarshal returns an InvalidUnmarshalError.
 func Unmarshal(data []byte, v interface{}) error {
@@ -47,7 +47,7 @@ func (e *InvalidUnmarshalError) Error() string {
 	return "fixedwidth: Unmarshal(nil " + e.Type.String() + ")"
 }
 
-// An UnmarshalTypeError describes a  value that was
+// An UnmarshalTypeError describes a value that was
 // not appropriate for a value of a specific Go type.
 type UnmarshalTypeError struct {
 	Value  string       // the raw value
@@ -70,7 +70,7 @@ func (e *UnmarshalTypeError) Error() string {
 	return s
 }
 
-// Decode reads from its input and stores the decoded data the value
+// Decode reads from its input and stores the decoded data to the value
 // pointed to by v.
 //
 // In the case that v points to a struct value, Decode will read a
