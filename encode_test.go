@@ -3,10 +3,11 @@ package fixedwidth
 import (
 	"bytes"
 	"fmt"
-	"github.com/pkg/errors"
 	"log"
 	"reflect"
 	"testing"
+
+	"github.com/pkg/errors"
 )
 
 func ExampleMarshal() {
@@ -14,8 +15,8 @@ func ExampleMarshal() {
 	people := []struct {
 		ID        int     `fixed:"1,5"`
 		FirstName string  `fixed:"6,15"`
-		LastName  string  `fixed:"16,25"`
-		Grade     float64 `fixed:"26,30"`
+		LastName  string  `fixed:"16,30"`
+		Grade     float64 `fixed:"31,36"`
 	}{
 		{1, "Ian", "Lopshire", 99.5},
 	}
@@ -24,9 +25,30 @@ func ExampleMarshal() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("%s", data)
+	fmt.Printf("\"%s\"", data)
 	// Output:
-	// 1    Ian       Lopshire  99.50
+	// "1    Ian       Lopshire       99.50 "
+}
+
+func ExampleMarshal_PadLeft() {
+	// define some data to encode
+	people := []struct {
+		ID        int     `fixed:"1,5"`
+		FirstName string  `fixed:"6,15"`
+		LastName  string  `fixed:"16,30"`
+		Grade     float64 `fixed:"31,36"`
+	}{
+		{1, "Ian", "Lopshire", 99.5},
+	}
+
+	data, err := MarshalWith(people, PadLeft)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("\"%s\"", data)
+
+	// Output:
+	// "    1       Ian       Lopshire 99.50"
 }
 
 func TestMarshal(t *testing.T) {
@@ -116,7 +138,8 @@ func TestNewValueEncoder(t *testing.T) {
 		{"TextUnmarshaler error", EncodableString{"foo", errors.New("TextUnmarshaler error")}, []byte("foo"), true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			o, err := newValueEncoder(reflect.TypeOf(tt.i))(reflect.ValueOf(tt.i))
+			e := NewEncoderWith(bytes.NewBufferString(""), PadRight)
+			o, err := e.newValueEncoder(reflect.TypeOf(tt.i))(reflect.ValueOf(tt.i))
 			if tt.shouldErr != (err != nil) {
 				t.Errorf("newValueEncoder(%s)() shouldErr expected %v, have %v (%v)", reflect.TypeOf(tt.i).Name(), tt.shouldErr, err != nil, err)
 			}

@@ -9,6 +9,36 @@ import (
 	"strconv"
 )
 
+// ValueWriter is responsible for writing an encoded value
+// the destination. ValueWriter should handle padding and
+// truncation.
+//
+// The value and destination params are provided by the encoder
+// The destination param will always have the length and capacity
+// of the interval being written. by default the the destination
+// is filled with spaces.
+type ValueWriter func(value, destination []byte) error
+
+// PadRight is a ValueWriter that pads values on the right.
+// If the the value is longer than the destination, the value
+// will be truncated on the right.
+func PadRight(value, destination []byte) error {
+	for i := 0; i < len(value) && i < len(destination); i++ {
+		destination[i] = value[i]
+	}
+	return nil
+}
+
+// PadLeft is a ValueWriter that pads values on the left.
+// If the the value is longer than the destination, the value
+// will be truncated on the left.
+func PadLeft(value, destination []byte) error {
+	for i := 0; i < len(value) && i < len(destination); i++ {
+		destination[len(destination)-i-1] = value[len(value)-i-1]
+	}
+	return nil
+}
+
 // Marshal returns the fixed-width encoding of v.
 //
 // v must be an encodable type or a slice of an encodable
@@ -45,6 +75,15 @@ func Marshal(v interface{}) ([]byte, error) {
 	return buff.Bytes(), nil
 }
 
+func MarshalWith(v interface{}, vw ValueWriter) ([]byte, error) {
+	buff := bytes.NewBuffer(nil)
+	err := NewEncoderWith(buff, vw).Encode(v)
+	if err != nil {
+		return nil, err
+	}
+	return buff.Bytes(), nil
+}
+
 // MarshalInvalidTypeError describes an invalid type being marshaled.
 type MarshalInvalidTypeError struct {
 	typeName string
@@ -57,13 +96,22 @@ func (e *MarshalInvalidTypeError) Error() string {
 // An Encoder writes fixed-width formatted data to an output
 // stream.
 type Encoder struct {
-	w *bufio.Writer
+	w  *bufio.Writer
+	vw ValueWriter
 }
 
 // NewEncoder returns a new encoder that writes to w.
 func NewEncoder(w io.Writer) *Encoder {
 	return &Encoder{
 		bufio.NewWriter(w),
+		PadRight,
+	}
+}
+
+func NewEncoderWith(w io.Writer, vw ValueWriter) *Encoder {
+	return &Encoder{
+		bufio.NewWriter(w),
+		vw,
 	}
 }
 
@@ -112,7 +160,7 @@ func (e *Encoder) writeLines(v reflect.Value) error {
 }
 
 func (e *Encoder) writeLine(v reflect.Value) (err error) {
-	b, err := newValueEncoder(v.Type())(v)
+	b, err := e.newValueEncoder(v.Type())(v)
 	if err != nil {
 		return err
 	}
@@ -122,32 +170,32 @@ func (e *Encoder) writeLine(v reflect.Value) (err error) {
 
 type valueEncoder func(v reflect.Value) ([]byte, error)
 
-func newValueEncoder(t reflect.Type) valueEncoder {
+func (e *Encoder) newValueEncoder(t reflect.Type) valueEncoder {
 	if t == nil {
-		return nilEncoder
+		return e.nilEncoder
 	}
 	if t.Implements(reflect.TypeOf(new(encoding.TextMarshaler)).Elem()) {
-		return textMarshalerEncoder
+		return e.textMarshalerEncoder
 	}
 
 	switch t.Kind() {
 	case reflect.Ptr, reflect.Interface:
-		return ptrInterfaceEncoder
+		return e.ptrInterfaceEncoder
 	case reflect.Struct:
-		return structEncoder
+		return e.structEncoder
 	case reflect.String:
-		return stringEncoder
+		return e.stringEncoder
 	case reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8:
-		return intEncoder
+		return e.intEncoder
 	case reflect.Float64:
-		return floatEncoder(2, 64)
+		return e.floatEncoder(2, 64)
 	case reflect.Float32:
-		return floatEncoder(2, 32)
+		return e.floatEncoder(2, 32)
 	}
-	return unknownTypeEncoder(t)
+	return e.unknownTypeEncoder(t)
 }
 
-func structEncoder(v reflect.Value) ([]byte, error) {
+func (e *Encoder) structEncoder(v reflect.Value) ([]byte, error) {
 	var specs []fieldSpec
 	for i := 0; i < v.Type().NumField(); i++ {
 		f := v.Type().Field(i)
@@ -160,13 +208,13 @@ func structEncoder(v reflect.Value) ([]byte, error) {
 		if !ok {
 			continue
 		}
-		spec.value, err = newValueEncoder(f.Type)(v.Field(i))
+		spec.value, err = e.newValueEncoder(f.Type)(v.Field(i))
 		if err != nil {
 			return nil, err
 		}
 		specs = append(specs, spec)
 	}
-	return encodeSpecs(specs), nil
+	return encodeSpecs(specs, e.vw)
 }
 
 type fieldSpec struct {
@@ -174,7 +222,7 @@ type fieldSpec struct {
 	value            []byte
 }
 
-func encodeSpecs(specs []fieldSpec) []byte {
+func encodeSpecs(specs []fieldSpec, w ValueWriter) ([]byte, error) {
 	var ll int
 	for _, spec := range specs {
 		if spec.endPos > ll {
@@ -183,45 +231,44 @@ func encodeSpecs(specs []fieldSpec) []byte {
 	}
 	data := bytes.Repeat([]byte(" "), ll)
 	for _, spec := range specs {
-		for i, b := range spec.value {
-			if spec.startPos+i <= spec.endPos {
-				data[spec.startPos+i-1] = b
-			}
+		err := w(spec.value, data[spec.startPos-1:spec.endPos:spec.endPos])
+		if err != nil {
+			return nil, err
 		}
 	}
-	return data
+	return data, nil
 }
 
-func textMarshalerEncoder(v reflect.Value) ([]byte, error) {
+func (e *Encoder) textMarshalerEncoder(v reflect.Value) ([]byte, error) {
 	return v.Interface().(encoding.TextMarshaler).MarshalText()
 }
 
-func ptrInterfaceEncoder(v reflect.Value) ([]byte, error) {
+func (e *Encoder) ptrInterfaceEncoder(v reflect.Value) ([]byte, error) {
 	if v.IsNil() {
-		return nilEncoder(v)
+		return e.nilEncoder(v)
 	}
-	return newValueEncoder(v.Elem().Type())(v.Elem())
+	return e.newValueEncoder(v.Elem().Type())(v.Elem())
 }
 
-func stringEncoder(v reflect.Value) ([]byte, error) {
+func (e *Encoder) stringEncoder(v reflect.Value) ([]byte, error) {
 	return []byte(v.String()), nil
 }
 
-func intEncoder(v reflect.Value) ([]byte, error) {
+func (e *Encoder) intEncoder(v reflect.Value) ([]byte, error) {
 	return []byte(strconv.Itoa(int(v.Int()))), nil
 }
 
-func floatEncoder(perc, bitSize int) valueEncoder {
+func (e *Encoder) floatEncoder(perc, bitSize int) valueEncoder {
 	return func(v reflect.Value) ([]byte, error) {
 		return []byte(strconv.FormatFloat(v.Float(), 'f', perc, bitSize)), nil
 	}
 }
 
-func nilEncoder(v reflect.Value) ([]byte, error) {
+func (e *Encoder) nilEncoder(v reflect.Value) ([]byte, error) {
 	return nil, nil
 }
 
-func unknownTypeEncoder(t reflect.Type) valueEncoder {
+func (e *Encoder) unknownTypeEncoder(t reflect.Type) valueEncoder {
 	return func(value reflect.Value) ([]byte, error) {
 		return nil, &MarshalInvalidTypeError{typeName: t.Name()}
 	}
