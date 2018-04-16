@@ -87,36 +87,44 @@ func (d *Decoder) Decode(v interface{}) error {
 	if reflect.Indirect(reflect.ValueOf(v)).Kind() == reflect.Slice {
 		return d.readLines(reflect.ValueOf(v).Elem())
 	}
-	return d.readLine(reflect.ValueOf(v))
+
+	err, _ := d.readLine(reflect.ValueOf(v))
+	return err
 }
 
 func (d *Decoder) readLines(v reflect.Value) (err error) {
 	ct := v.Type().Elem()
 	for {
 		nv := reflect.New(ct).Elem()
-		err := d.readLine(nv)
+		err, ok := d.readLine(nv)
 		if err != nil {
 			return err
+		}
+		if ok {
+			v.Set(reflect.Append(v, nv))
 		}
 		if d.done {
 			break
 		}
-		v.Set(reflect.Append(v, nv))
 	}
 	return nil
 }
 
-func (d *Decoder) readLine(v reflect.Value) (err error) {
-	// TODO: properly handle prefixed lines
-	line, _, err := d.data.ReadLine()
+func (d *Decoder) readLine(v reflect.Value) (err error, ok bool) {
+	var line []byte
+	line, err = d.data.ReadBytes('\n')
+	if err != nil && err != io.EOF {
+		return err, false
+	}
 	if err == io.EOF {
 		d.done = true
-		return nil
-	} else if err != nil {
-		return err
-	}
 
-	return newValueSetter(v.Type())(v, line)
+		if line == nil || len(line) <= 0 || line[0] == '\n' {
+			// skip last empty lines
+			return nil, false
+		}
+	}
+	return newValueSetter(v.Type())(v, line), true
 }
 
 func rawValueFromLine(line []byte, startPos, endPos int) []byte {

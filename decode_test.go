@@ -53,11 +53,32 @@ func TestUnmarshal(t *testing.T) {
 		shouldErr bool
 	}{
 		{
-			name:     "Basic Slice Case",
+			name:     "Slice Case (no trailing new line)",
 			rawValue: []byte("foo  123  1.2  bar" + "\n" + "bar  321  2.1  foo"),
 			target:   &[]allTypes{},
 			expected: &[]allTypes{
 				{"foo", 123, 1.2, EncodableString{"bar", nil}},
+				{"bar", 321, 2.1, EncodableString{"foo", nil}},
+			},
+			shouldErr: false,
+		},
+		{
+			name:     "Slice Case (trailing new line)",
+			rawValue: []byte("foo  123  1.2  bar" + "\n" + "bar  321  2.1  foo" + "\n"),
+			target:   &[]allTypes{},
+			expected: &[]allTypes{
+				{"foo", 123, 1.2, EncodableString{"bar", nil}},
+				{"bar", 321, 2.1, EncodableString{"foo", nil}},
+			},
+			shouldErr: false,
+		},
+		{
+			name:     "Slice Case (blank line mid file)",
+			rawValue: []byte("foo  123  1.2  bar" + "\n" + "\n"+ "bar  321  2.1  foo" + "\n"),
+			target:   &[]allTypes{},
+			expected: &[]allTypes{
+				{"foo", 123, 1.2, EncodableString{"bar", nil}},
+				{"", 0, 0, EncodableString{"", nil}},
 				{"bar", 321, 2.1, EncodableString{"foo", nil}},
 			},
 			shouldErr: false,
@@ -94,7 +115,7 @@ func TestUnmarshal(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := Unmarshal(tt.rawValue, tt.target)
 			if tt.shouldErr != (err != nil) {
-				t.Errorf("Unmarshal() err want %v, have %v (%v)", tt.shouldErr, err != nil, err.Error())
+				t.Errorf("Unmarshal() err want %v, have %v (%v)", tt.shouldErr, err != nil, err)
 			}
 			if !tt.shouldErr && !reflect.DeepEqual(tt.target, tt.expected) {
 				t.Errorf("Unmarshal() want %+v, have %+v", tt.expected, tt.target)
