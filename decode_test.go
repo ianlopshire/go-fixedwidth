@@ -1,11 +1,11 @@
 package fixedwidth
 
 import (
+	"encoding"
 	"fmt"
 	"log"
 	"reflect"
 	"testing"
-	"encoding"
 )
 
 func ExampleUnmarshal() {

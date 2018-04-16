@@ -54,13 +54,13 @@ type UnmarshalTypeError struct {
 	Type   reflect.Type // type of Go value it could not be assigned to
 	Struct string       // name of the struct type containing the field
 	Field  string       // name of the field holding the Go value
-	Cause error // original error
+	Cause  error        // original error
 }
 
 func (e *UnmarshalTypeError) Error() string {
 	var s string
 	if e.Struct != "" || e.Field != "" {
-		s =  "fixedwidth: cannot unmarshal " + e.Value + " into Go struct field " + e.Struct + "." + e.Field + " of type " + e.Type.String()
+		s = "fixedwidth: cannot unmarshal " + e.Value + " into Go struct field " + e.Struct + "." + e.Field + " of type " + e.Type.String()
 	} else {
 		s = "fixedwidth: cannot unmarshal " + e.Value + " into Go value of type " + e.Type.String()
 	}
@@ -126,7 +126,7 @@ func rawValueFromLine(line []byte, startPos, endPos int) []byte {
 	if endPos > len(line) {
 		endPos = len(line)
 	}
-	return bytes.TrimSpace(line[startPos-1:endPos])
+	return bytes.TrimSpace(line[startPos-1 : endPos])
 }
 
 type valueSetter func(v reflect.Value, raw []byte) error
@@ -160,7 +160,7 @@ func newValueSetter(t reflect.Type) valueSetter {
 	return unknownSetter
 }
 
-func structSetter (v reflect.Value, raw []byte) error {
+func structSetter(v reflect.Value, raw []byte) error {
 	t := v.Type()
 	for i := 0; i < v.NumField(); i++ {
 		fv := v.Field(i)
@@ -196,7 +196,7 @@ func textUnmarshalerSetter(t reflect.Type, shouldAddr bool) valueSetter {
 			v = v.Addr()
 		}
 		// set to zero value if this is nil
-		if t.Kind() == reflect.Ptr && v.IsNil(){
+		if t.Kind() == reflect.Ptr && v.IsNil() {
 			v.Set(reflect.New(t.Elem()))
 		}
 		return v.Interface().(encoding.TextUnmarshaler).UnmarshalText(raw)
