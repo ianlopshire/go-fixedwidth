@@ -58,12 +58,15 @@ func (e *MarshalInvalidTypeError) Error() string {
 // stream.
 type Encoder struct {
 	w *bufio.Writer
+
+	LineEnd []byte
 }
 
 // NewEncoder returns a new encoder that writes to w.
 func NewEncoder(w io.Writer) *Encoder {
 	return &Encoder{
-		bufio.NewWriter(w),
+		w:       bufio.NewWriter(w),
+		LineEnd: []byte("\n"),
 	}
 }
 
@@ -95,6 +98,10 @@ func (e *Encoder) Encode(i interface{}) (err error) {
 }
 
 func (e *Encoder) writeLines(v reflect.Value) error {
+	lineEnd := e.LineEnd
+	if len(lineEnd) == 0 {
+		lineEnd = []byte("\n")
+	}
 	for i := 0; i < v.Len(); i++ {
 		err := e.writeLine(v.Index(i))
 		if err != nil {
@@ -102,7 +109,7 @@ func (e *Encoder) writeLines(v reflect.Value) error {
 		}
 
 		if i != v.Len()-1 {
-			_, err := e.w.Write([]byte("\n"))
+			_, err := e.w.Write(lineEnd)
 			if err != nil {
 				return err
 			}
