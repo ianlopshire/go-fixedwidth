@@ -3,26 +3,47 @@ package fixedwidth
 import (
 	"strconv"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
-// parseTag splits a struct fields fixed tag into its start and end positions.
-// If the tag is not valid, ok will be false.
-func parseTag(tag string) (startPos, endPos int, ok bool) {
+var errEmptyTag = errors.New("empty tag")
+
+// parseTag returns the fieldSpec from the tag params.
+// If the tag is not valid, it will return an error.
+func parseTag(tag string) (fieldSpec, error) {
+	if tag == "" {
+		return fieldSpec{}, errEmptyTag
+	}
 	parts := strings.Split(tag, ",")
-	if len(parts) != 2 {
-		return startPos, endPos, false
+	if len(parts) < 2 {
+		return fieldSpec{}, errors.Errorf("missing start and end positions: %q", tag)
+	}
+	if len(parts) > 3 {
+		return fieldSpec{}, errors.Errorf("invalid fixed tag: %q", tag)
 	}
 
-	var err error
-	if startPos, err = strconv.Atoi(parts[0]); err != nil {
-		return startPos, endPos, false
+	var (
+		spec fieldSpec
+		err  error
+	)
+	if spec.startPos, err = strconv.Atoi(parts[0]); err != nil {
+		return fieldSpec{}, err
 	}
-	if endPos, err = strconv.Atoi(parts[1]); err != nil {
-		return startPos, endPos, false
+	if spec.endPos, err = strconv.Atoi(parts[1]); err != nil {
+		return fieldSpec{}, err
 	}
-	if startPos > endPos || (startPos == 0 && endPos == 0) {
-		return startPos, endPos, false
+	if spec.startPos > spec.endPos || (spec.startPos == 0 && spec.endPos == 0) {
+		return fieldSpec{}, errors.Errorf("end position (%d) ahead of start position (%d)", spec.startPos, spec.endPos)
+	}
+	if len(parts) == 2 {
+		return spec, nil
 	}
 
-	return startPos, endPos, true
+	if parts[2] != "leftpad" {
+		return fieldSpec{}, errors.Errorf("unknown fied tag option %q", parts[2])
+	}
+	spec.leftpad = true
+
+	return spec, nil
 }

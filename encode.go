@@ -154,10 +154,9 @@ func structEncoder(v reflect.Value) ([]byte, error) {
 		var (
 			err  error
 			spec fieldSpec
-			ok   bool
 		)
-		spec.startPos, spec.endPos, ok = parseTag(f.Tag.Get("fixed"))
-		if !ok {
+		spec, err = parseTag(f.Tag.Get("fixed"))
+		if err != nil {
 			continue
 		}
 		spec.value, err = newValueEncoder(f.Type)(v.Field(i))
@@ -171,6 +170,7 @@ func structEncoder(v reflect.Value) ([]byte, error) {
 
 type fieldSpec struct {
 	startPos, endPos int
+	leftpad          bool
 	value            []byte
 }
 

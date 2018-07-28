@@ -176,12 +176,12 @@ func structSetter(v reflect.Value, raw []byte) error {
 			continue
 		}
 		sf := t.Field(i)
-		startPos, endPos, ok := parseTag(sf.Tag.Get("fixed"))
-		if !ok {
-			continue
+		spec, err := parseTag(sf.Tag.Get("fixed"))
+		if err != nil {
+			return err
 		}
-		rawValue := rawValueFromLine(raw, startPos, endPos)
-		err := newValueSetter(sf.Type)(fv, rawValue)
+		rawValue := rawValueFromLine(raw, spec.startPos, spec.endPos)
+		err = newValueSetter(sf.Type)(fv, rawValue)
 		if err != nil {
 			return &UnmarshalTypeError{string(rawValue), sf.Type, t.Name(), sf.Name, err}
 		}
