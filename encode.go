@@ -58,12 +58,15 @@ func (e *MarshalInvalidTypeError) Error() string {
 // stream.
 type Encoder struct {
 	w *bufio.Writer
+
+	LineEnd []byte
 }
 
 // NewEncoder returns a new encoder that writes to w.
 func NewEncoder(w io.Writer) *Encoder {
 	return &Encoder{
-		bufio.NewWriter(w),
+		w:       bufio.NewWriter(w),
+		LineEnd: []byte("\n"),
 	}
 }
 
@@ -95,6 +98,10 @@ func (e *Encoder) Encode(i interface{}) (err error) {
 }
 
 func (e *Encoder) writeLines(v reflect.Value) error {
+	lineEnd := e.LineEnd
+	if len(lineEnd) == 0 {
+		lineEnd = []byte("\n")
+	}
 	for i := 0; i < v.Len(); i++ {
 		err := e.writeLine(v.Index(i))
 		if err != nil {
@@ -102,7 +109,7 @@ func (e *Encoder) writeLines(v reflect.Value) error {
 		}
 
 		if i != v.Len()-1 {
-			_, err := e.w.Write([]byte("\n"))
+			_, err := e.w.Write(lineEnd)
 			if err != nil {
 				return err
 			}
@@ -159,9 +166,15 @@ func structEncoder(v reflect.Value) ([]byte, error) {
 		if err != nil {
 			continue
 		}
-		spec.value, err = newValueEncoder(f.Type)(v.Field(i))
+		value, err := newValueEncoder(f.Type)(v.Field(i))
 		if err != nil {
 			return nil, err
+		}
+		if len(value) < spec.fieldLength() && spec.leftpad {
+			spec.value = bytes.Repeat([]byte{spec.leftpadChar(f.Type)}, spec.fieldLength())
+			copy(spec.value[spec.fieldLength()-len(value):len(spec.value)], value)
+		} else {
+			spec.value = value
 		}
 		specs = append(specs, spec)
 	}
@@ -174,6 +187,33 @@ type fieldSpec struct {
 	value            []byte
 }
 
+func (f fieldSpec) fieldLength() int {
+	return f.endPos - f.startPos + 1
+}
+
+func (f fieldSpec) leftpadChar(t reflect.Type) byte {
+	if t.Implements(reflect.TypeOf(new(encoding.TextMarshaler)).Elem()) {
+		return ' '
+	}
+
+	switch t.Kind() {
+	case reflect.Ptr:
+		return f.leftpadChar(t.Elem())
+	case reflect.Interface:
+		return ' '
+	case reflect.Struct:
+		return ' '
+	case reflect.String:
+		return ' '
+	case reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8:
+		return '0'
+	case reflect.Float32, reflect.Float64:
+		return '0'
+	default:
+		return ' '
+	}
+}
+
 func encodeSpecs(specs []fieldSpec) []byte {
 	var ll int
 	for _, spec := range specs {
@@ -183,11 +223,7 @@ func encodeSpecs(specs []fieldSpec) []byte {
 	}
 	data := bytes.Repeat([]byte(" "), ll)
 	for _, spec := range specs {
-		for i, b := range spec.value {
-			if spec.startPos+i <= spec.endPos {
-				data[spec.startPos+i-1] = b
-			}
-		}
+		copy(data[spec.startPos-1:spec.endPos], spec.value)
 	}
 	return data
 }

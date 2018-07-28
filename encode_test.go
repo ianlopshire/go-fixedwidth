@@ -3,10 +3,11 @@ package fixedwidth
 import (
 	"bytes"
 	"fmt"
-	"github.com/pkg/errors"
 	"log"
 	"reflect"
 	"testing"
+
+	"github.com/pkg/errors"
 )
 
 func ExampleMarshal() {
@@ -69,7 +70,20 @@ func TestMarshal(t *testing.T) {
 	}
 }
 
+type DifferentFixedTags struct {
+	RegularStr string `fixed:"1,5"`
+	RegularInt int    `fixed:"6,10"`
+
+	PadStr string `fixed:"11,15,leftpad"`
+	PadInt int    `fixed:"16,20,leftpad"`
+
+	PadPtrStr *string `fixed:"21,30,leftpad"`
+	PadPtrInt *int    `fixed:"31,40,leftpad"`
+}
+
 func TestNewValueEncoder(t *testing.T) {
+	threeStr := "three"
+	threeInt := 3
 	for _, tt := range []struct {
 		name      string
 		i         interface{}
@@ -114,6 +128,10 @@ func TestNewValueEncoder(t *testing.T) {
 		{"TextUnmarshaler", EncodableString{"foo", nil}, []byte("foo"), false},
 		{"TextUnmarshaler interface", interface{}(EncodableString{"foo", nil}), []byte("foo"), false},
 		{"TextUnmarshaler error", EncodableString{"foo", errors.New("TextUnmarshaler error")}, []byte("foo"), true},
+
+		{"DifferentFixedTags", DifferentFixedTags{"one", 1, "two", 2, &threeStr, &threeInt}, []byte("one  1      two00002     three0000000003"), false},
+		{"DifferentFixedTags without values", DifferentFixedTags{}, []byte("     0         00000          0000000000"), false},
+		{"DifferentFixedTags full pad", DifferentFixedTags{"first", 12345, "secnd", 67890, &threeStr, &threeInt}, []byte("first12345secnd67890     three0000000003"), false},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			o, err := newValueEncoder(reflect.TypeOf(tt.i))(reflect.ValueOf(tt.i))
@@ -121,7 +139,7 @@ func TestNewValueEncoder(t *testing.T) {
 				t.Errorf("newValueEncoder(%s)() shouldErr expected %v, have %v (%v)", reflect.TypeOf(tt.i).Name(), tt.shouldErr, err != nil, err)
 			}
 			if !tt.shouldErr && !bytes.Equal(o, tt.o) {
-				t.Errorf("newValueEncoder(%s)() expected %v, have %v", reflect.TypeOf(tt.i).Name(), tt.o, o)
+				t.Errorf("newValueEncoder(%s)()\nexpected %q\nreceived %q", reflect.TypeOf(tt.i).Name(), tt.o, o)
 			}
 		})
 	}
