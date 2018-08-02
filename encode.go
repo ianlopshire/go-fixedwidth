@@ -149,6 +149,14 @@ func newValueEncoder(t reflect.Type) valueEncoder {
 
 func structEncoder(v reflect.Value) ([]byte, error) {
 	var specs []fieldSpec
+	err := appendStructSpecs(v, &specs)
+	if err != nil {
+		return nil, err
+	}
+	return encodeSpecs(specs), nil
+}
+
+func appendStructSpecs(v reflect.Value, specs *[]fieldSpec) error {
 	for i := 0; i < v.Type().NumField(); i++ {
 		f := v.Type().Field(i)
 		var (
@@ -156,17 +164,25 @@ func structEncoder(v reflect.Value) ([]byte, error) {
 			spec fieldSpec
 			ok   bool
 		)
+
+		if f.Anonymous && f.Type.Kind() == reflect.Struct {
+			err := appendStructSpecs(v.Field(i), specs)
+			if err != nil {
+				return err
+			}
+		}
+
 		spec.startPos, spec.endPos, ok = parseTag(f.Tag.Get("fixed"))
 		if !ok {
 			continue
 		}
 		spec.value, err = newValueEncoder(f.Type)(v.Field(i))
 		if err != nil {
-			return nil, err
+			return err
 		}
-		specs = append(specs, spec)
+		*specs = append(*specs, spec)
 	}
-	return encodeSpecs(specs), nil
+	return nil
 }
 
 type fieldSpec struct {

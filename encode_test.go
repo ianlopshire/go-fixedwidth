@@ -3,10 +3,11 @@ package fixedwidth
 import (
 	"bytes"
 	"fmt"
-	"github.com/pkg/errors"
 	"log"
 	"reflect"
 	"testing"
+
+	"github.com/pkg/errors"
 )
 
 func ExampleMarshal() {
@@ -52,8 +53,8 @@ func TestMarshal(t *testing.T) {
 		{"empty slice", []H{}, nil, false},
 		{"pointer", &H{"foo", 1}, []byte("foo  1    "), false},
 		{"nil", nil, nil, false},
-		{"invalid type", true, nil, true},
-		{"invalid type in struct", H{"foo", true}, nil, true},
+		{"invalid type", 11i, nil, true},
+		{"invalid type in struct", H{11i, 12i}, nil, true},
 		{"marshal error", EncodableString{"", marshalError}, nil, true},
 		{"invalid tags", tagHelper, []byte("foo  "), false},
 	} {

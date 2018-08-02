@@ -176,6 +176,14 @@ func structSetter(v reflect.Value, raw []byte) error {
 			continue
 		}
 		sf := t.Field(i)
+
+		if sf.Anonymous && sf.Type.Kind() == reflect.Struct {
+			err := structSetter(fv, raw)
+			if err != nil {
+				return err
+			}
+		}
+
 		startPos, endPos, ok := parseTag(sf.Tag.Get("fixed"))
 		if !ok {
 			continue
