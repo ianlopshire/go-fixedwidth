@@ -74,7 +74,7 @@ func TestUnmarshal(t *testing.T) {
 		},
 		{
 			name:     "Slice Case (blank line mid file)",
-			rawValue: []byte("foo  123  1.2  bar" + "\n" + "\n"+ "bar  321  2.1  foo" + "\n"),
+			rawValue: []byte("foo  123  1.2  bar" + "\n" + "\n" + "bar  321  2.1  foo" + "\n"),
 			target:   &[]allTypes{},
 			expected: &[]allTypes{
 				{"foo", 123, 1.2, EncodableString{"bar", nil}},
@@ -123,6 +123,21 @@ func TestUnmarshal(t *testing.T) {
 
 		})
 	}
+
+	t.Run("Field Length 1", func(t *testing.T) {
+		var st = struct {
+			F1 string `fixed:"1,1"`
+		}{}
+
+		err := Unmarshal([]byte("v"), &st)
+		if err != nil {
+			t.Errorf("Unmarshal() err %v", err)
+		}
+
+		if st.F1 != "v" {
+			t.Errorf("Unmarshal() want %v, have %v", "v", st.F1)
+		}
+	})
 
 	t.Run("Invalid Unmarshal Errors", func(t *testing.T) {
 		for _, tt := range []struct {
