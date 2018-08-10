@@ -74,7 +74,7 @@ func TestUnmarshal(t *testing.T) {
 		},
 		{
 			name:     "Slice Case (blank line mid file)",
-			rawValue: []byte("foo  123  1.2  bar" + "\n" + "\n"+ "bar  321  2.1  foo" + "\n"),
+			rawValue: []byte("foo  123  1.2  bar" + "\n" + "\n" + "bar  321  2.1  foo" + "\n"),
 			target:   &[]allTypes{},
 			expected: &[]allTypes{
 				{"foo", 123, 1.2, EncodableString{"bar", nil}},
@@ -203,4 +203,23 @@ func TestNewValueSetter(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestUnmarshalLenghtOne(t *testing.T) {
+	type simpleType struct {
+		One string `fixed:"1,1"`
+	}
+
+	b := []byte("B")
+	var simple simpleType
+
+	err := Unmarshal(b, &simple)
+	if err != nil {
+		t.Errorf("Unmarshal should fine, have %s", err)
+	}
+
+	if simple.One != "B" {
+		t.Errorf("value should be %q, have %q", "B", simple.One)
+	}
+
 }

@@ -128,7 +128,7 @@ func (d *Decoder) readLine(v reflect.Value) (err error, ok bool) {
 }
 
 func rawValueFromLine(line []byte, startPos, endPos int) []byte {
-	if len(line) == 0 || startPos >= len(line) {
+	if len(line) == 0 || startPos > len(line) {
 		return []byte{}
 	}
 	if endPos > len(line) {
