@@ -219,3 +219,22 @@ func TestNewValueSetter(t *testing.T) {
 		})
 	}
 }
+
+func TestUnmarshalLenghtOne(t *testing.T) {
+	type simpleType struct {
+		One string `fixed:"1,1"`
+	}
+
+	b := []byte("B")
+	var simple simpleType
+
+	err := Unmarshal(b, &simple)
+	if err != nil {
+		t.Errorf("Unmarshal should fine, have %s", err)
+	}
+
+	if simple.One != "B" {
+		t.Errorf("value should be %q, have %q", "B", simple.One)
+	}
+
+}
