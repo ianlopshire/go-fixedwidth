@@ -7,6 +7,7 @@ import (
 	"io"
 	"reflect"
 	"strconv"
+	"sync"
 )
 
 // Marshal returns the fixed-width encoding of v.
@@ -148,48 +149,56 @@ func newValueEncoder(t reflect.Type) valueEncoder {
 }
 
 func structEncoder(v reflect.Value) ([]byte, error) {
-	var specs []fieldSpec
-	for i := 0; i < v.Type().NumField(); i++ {
-		f := v.Type().Field(i)
-		var (
-			err  error
-			spec fieldSpec
-			ok   bool
-		)
-		spec.startPos, spec.endPos, ok = parseTag(f.Tag.Get("fixed"))
-		if !ok {
+	ss := cachedStructSpec(v.Type())
+	dst := bytes.Repeat([]byte(" "), ss.ll)
+
+	for i, spec := range ss.fieldSpecs {
+		if !spec.ok {
 			continue
 		}
-		spec.value, err = newValueEncoder(f.Type)(v.Field(i))
+
+		val, err := newValueEncoder(v.Field(i).Type())(v.Field(i))
 		if err != nil {
 			return nil, err
 		}
-		specs = append(specs, spec)
+		copy(dst[spec.startPos-1:spec.endPos:spec.endPos], val)
 	}
-	return encodeSpecs(specs), nil
+	return dst, nil
+}
+
+type structSpec struct {
+	ll         int
+	fieldSpecs []fieldSpec
 }
 
 type fieldSpec struct {
 	startPos, endPos int
-	value            []byte
+	ok               bool
 }
 
-func encodeSpecs(specs []fieldSpec) []byte {
-	var ll int
-	for _, spec := range specs {
-		if spec.endPos > ll {
-			ll = spec.endPos
+func buildStructSpec(t reflect.Type) structSpec {
+	ss := structSpec{
+		fieldSpecs: make([]fieldSpec, t.NumField()),
+	}
+	for i := 0; i < t.NumField(); i++ {
+		f := t.Field(i)
+		ss.fieldSpecs[i].startPos, ss.fieldSpecs[i].endPos, ss.fieldSpecs[i].ok = parseTag(f.Tag.Get("fixed"))
+		if ss.fieldSpecs[i].endPos > ss.ll {
+			ss.ll = ss.fieldSpecs[i].endPos
 		}
 	}
-	data := bytes.Repeat([]byte(" "), ll)
-	for _, spec := range specs {
-		for i, b := range spec.value {
-			if spec.startPos+i <= spec.endPos {
-				data[spec.startPos+i-1] = b
-			}
-		}
+	return ss
+}
+
+var fieldSpecCache sync.Map // map[reflect.Type]structSpec
+
+// cachedStructSpec is like buildStructSpec but cached to prevent duplicate work.
+func cachedStructSpec(t reflect.Type) structSpec {
+	if f, ok := fieldSpecCache.Load(t); ok {
+		return f.(structSpec)
 	}
-	return data
+	f, _ := fieldSpecCache.LoadOrStore(t, buildStructSpec(t))
+	return f.(structSpec)
 }
 
 func textMarshalerEncoder(v reflect.Value) ([]byte, error) {
