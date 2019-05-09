@@ -91,6 +91,9 @@ func (d *Decoder) Decode(v interface{}) error {
 
 	err, ok := d.readLine(reflect.ValueOf(v))
 	if d.done && err == nil && !ok {
+		// d.done means we've reached the end of the file. err == nil && !ok
+		// indicates that there was no data to read, so we propagate an io.EOF
+		// upwards so our caller knows there is no data left.
 		return io.EOF
 	}
 	return err

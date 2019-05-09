@@ -151,8 +151,6 @@ func TestUnmarshal(t *testing.T) {
 			{"Invalid Unmarshal Not Pointer 1", struct{}{}, true},
 			{"Invalid Unmarshal Not Pointer 2", []struct{}{}, true},
 			{"Valid Unmarshal slice", &[]struct{}{}, false},
-			// TODO: technically you can unmarshal an empty struct from empty
-			// string, since it takes no space. Should that EOF or succeed?
 			{"Valid Unmarshal struct", &struct{}{}, true},
 		} {
 			t.Run(tt.name, func(t *testing.T) {
@@ -224,7 +222,9 @@ func TestNewValueSetter(t *testing.T) {
 	}
 }
 
-func TestDecode(t *testing.T) {
+// Verify the behavior of Decoder.Decode at the end of a file. See
+// https://github.com/ianlopshire/go-fixedwidth/issues/6 for more details.
+func TestDecode_EOF(t *testing.T) {
 	d := NewDecoder(bytes.NewReader([]byte("")))
 	type S struct {
 		Field1 string `fixed:"1,1"`
