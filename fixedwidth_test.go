@@ -10,6 +10,10 @@ var (
 func float64p(v float64) *float64 { return &v }
 func float32p(v float32) *float32 { return &v }
 func intp(v int) *int             { return &v }
+func int64p(v int64) *int64       { return &v }
+func int32p(v int32) *int32       { return &v }
+func int16p(v int16) *int16       { return &v }
+func int8p(v int8) *int8          { return &v }
 func stringp(v string) *string    { return &v }
 
 // EncodableString is a string that implements the encoding TextUnmarshaler and TextMarshaler interface.
