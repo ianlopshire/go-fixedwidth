@@ -74,7 +74,8 @@ func (e *UnmarshalTypeError) Error() string {
 // pointed to by v.
 //
 // In the case that v points to a struct value, Decode will read a
-// single line from the input.
+// single line from the input. If there is no data remaining in the file,
+// returns io.EOF
 //
 // In the case that v points to a slice value, Decode will read until
 // the end of its input.
@@ -88,7 +89,10 @@ func (d *Decoder) Decode(v interface{}) error {
 		return d.readLines(reflect.ValueOf(v).Elem())
 	}
 
-	err, _ := d.readLine(reflect.ValueOf(v))
+	err, ok := d.readLine(reflect.ValueOf(v))
+	if d.done && err == nil && !ok {
+		return io.EOF
+	}
 	return err
 }
 
