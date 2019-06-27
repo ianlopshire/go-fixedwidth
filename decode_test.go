@@ -211,7 +211,7 @@ func TestNewValueSetter(t *testing.T) {
 			// ensure we have an addressable target
 			var i = reflect.Indirect(reflect.New(reflect.TypeOf(tt.expected)))
 
-			err := newValueSetter(i.Type())(i, tt.raw)
+			err := newValueSetter(i.Type())(i, rawLine{bytes: tt.raw})
 			if tt.shouldErr != (err != nil) {
 				t.Errorf("newValueSetter(%s)() err want %v, have %v (%v)", reflect.TypeOf(tt.expected).Name(), tt.shouldErr, err != nil, err.Error())
 			}
@@ -220,6 +220,50 @@ func TestNewValueSetter(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDecodeSetUseCodepointIndices(t *testing.T) {
+	type S struct {
+		A string `fixed:"1,5"`
+		B string `fixed:"6,10"`
+		C string `fixed:"11,15"`
+	}
+
+	for _, tt := range []struct {
+		name     string
+		raw      []byte
+		expected S
+	}{
+		{
+			name:     "All ASCII characters",
+			raw:      []byte("ABCD EFGH IJKL \n"),
+			expected: S{"ABCD", "EFGH", "IJKL"},
+		},
+		{
+			name:     "Multi-byte characters",
+			raw:      []byte("ABCD ☃☃   EFG  \n"),
+			expected: S{"ABCD", "☃☃", "EFG"},
+		},
+		{
+			name:     "Truncated with multi-byte characters",
+			raw:      []byte("☃☃\n"),
+			expected: S{"☃☃", "", ""},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			d := NewDecoder(bytes.NewReader(tt.raw))
+			d.SetUseCodepointIndices(true)
+			var s S
+			err := d.Decode(&s)
+			if err != nil {
+				t.Errorf("Unexpected err: %v", err)
+			}
+			if !reflect.DeepEqual(tt.expected, s) {
+				t.Errorf("Decode(%v) want %v, have %v", tt.raw, tt.expected, s)
+			}
+		})
+	}
+
 }
 
 // Verify the behavior of Decoder.Decode at the end of a file. See
