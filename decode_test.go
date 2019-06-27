@@ -249,6 +249,11 @@ func TestDecodeSetUseCodepointIndices(t *testing.T) {
 			raw:      []byte("☃☃\n"),
 			expected: S{"☃☃", "", ""},
 		},
+		{
+			name:     "Multi-byte characters",
+			raw:      []byte("PIÑA DEFGHIJKLM"),
+			expected: S{"PIÑA", "DEFGH", "IJKLM"},
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			d := NewDecoder(bytes.NewReader(tt.raw))

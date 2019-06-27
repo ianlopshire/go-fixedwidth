@@ -195,12 +195,17 @@ func rawValueFromLine(line rawLine, startPos, endPos int) rawLine {
 		if len(line.codepointIndices) == 0 || startPos > len(line.codepointIndices) {
 			return rawLine{bytes: []byte{}}
 		}
-		if endPos > len(line.codepointIndices) {
-			endPos = len(line.codepointIndices)
+		var relevantIndices []int
+		var lineBytes []byte
+		if endPos >= len(line.codepointIndices) {
+			relevantIndices = line.codepointIndices[startPos-1:]
+			lineBytes = line.bytes[relevantIndices[0]:]
+		} else {
+			relevantIndices = line.codepointIndices[startPos-1 : endPos]
+			lineBytes = line.bytes[relevantIndices[0]:line.codepointIndices[endPos]]
 		}
-		relevantIndices := line.codepointIndices[startPos-1 : endPos]
 		return rawLine{
-			bytes:            bytes.TrimSpace(line.bytes[relevantIndices[0]:relevantIndices[len(relevantIndices)-1]]),
+			bytes:            bytes.TrimSpace(lineBytes),
 			codepointIndices: relevantIndices,
 		}
 	} else {
