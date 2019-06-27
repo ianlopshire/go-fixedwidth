@@ -294,3 +294,36 @@ func TestDecode_EOF(t *testing.T) {
 		t.Errorf("Decode should have returned an EOF error. Returned: %v", err)
 	}
 }
+
+func TestNewRawLine(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		input    []byte
+		expected []int
+	}{
+		{
+			name:     "All ASCII",
+			input:    []byte("ABC"),
+			expected: []int(nil),
+		},
+		{
+			name:     "All multi-byte",
+			input:    []byte("☃☃☃"),
+			expected: []int{0, 3, 6},
+		},
+		{
+			name:     "Mixed",
+			input:    []byte("abc☃☃☃123"),
+			expected: []int{0, 1, 2, 3, 6, 9, 12, 13, 14},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := newRawLine(tt.input, true)
+			if err != nil {
+				t.Errorf("newRawLine(%v, true): Unexpected error", tt.input)
+			} else if !reflect.DeepEqual(tt.expected, result.codepointIndices) {
+				t.Errorf("newRawLine(%v, true): Unexpected result, expected %v got %v", tt.input, tt.expected, result.codepointIndices)
+			}
+		})
+	}
+}
