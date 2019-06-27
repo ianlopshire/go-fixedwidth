@@ -142,13 +142,13 @@ func newRawLine(bytes []byte, useCodepointIndices bool) (rawLine, error) {
 	if useCodepointIndices {
 		bytesIdx := 0
 		codepointIdx := 0
-		// Lazily allocate this only if the line actaully contains a multi-byte
+		// Lazily allocate this only if the line actually contains a multi-byte
 		// character.
 		codepointIndices := []int(nil)
 		for bytesIdx < len(bytes) {
 			_, codepointSize := utf8.DecodeRune(bytes[bytesIdx:])
 			if codepointSize == 0 {
-				return rawLine{}, errors.New("Invalid codepoint")
+				return rawLine{}, errors.New("fixedwidth: Invalid codepoint")
 			}
 			// We have a multi-byte codepoint, we need to allocate
 			// codepointIndices
