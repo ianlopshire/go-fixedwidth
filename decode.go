@@ -153,9 +153,9 @@ func newRawLine(bytes []byte, useCodepointIndices bool) (rawLine, error) {
 			// We have a multi-byte codepoint, we need to allocate
 			// codepointIndices
 			if codepointIndices == nil && codepointSize > 1 {
-				codepointIndices = make([]int, 0, bytesIdx)
+				codepointIndices = make([]int, bytesIdx)
 				for i := 0; i < bytesIdx; i++ {
-					codepointIndices = append(codepointIndices, i)
+					codepointIndices[i] = i
 				}
 			}
 			if codepointIndices != nil {
