@@ -80,5 +80,14 @@ for {
 }
 ```
 
+If you have an input where the indices are expressed in unicode codepoints, and
+not raw bytes fixedwidth supports this. Your data must be UTF-8 encoded:
+
+```go
+decoder := fixedwidth.NewDecoder(strings.NewReader(data))
+decoder.SetUseCodepointIndices(true)
+// Decode as usual now
+```
+
 ## Licence
 MIT
