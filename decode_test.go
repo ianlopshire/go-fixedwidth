@@ -211,7 +211,7 @@ func TestNewValueSetter(t *testing.T) {
 			// ensure we have an addressable target
 			var i = reflect.Indirect(reflect.New(reflect.TypeOf(tt.expected)))
 
-			err := newValueSetter(i.Type())(i, tt.raw)
+			err := newValueSetter(i.Type())(i, rawValue{bytes: tt.raw})
 			if tt.shouldErr != (err != nil) {
 				t.Errorf("newValueSetter(%s)() err want %v, have %v (%v)", reflect.TypeOf(tt.expected).Name(), tt.shouldErr, err != nil, err.Error())
 			}
@@ -220,6 +220,55 @@ func TestNewValueSetter(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDecodeSetUseCodepointIndices(t *testing.T) {
+	type S struct {
+		A string `fixed:"1,5"`
+		B string `fixed:"6,10"`
+		C string `fixed:"11,15"`
+	}
+
+	for _, tt := range []struct {
+		name     string
+		raw      []byte
+		expected S
+	}{
+		{
+			name:     "All ASCII characters",
+			raw:      []byte("ABCD EFGH IJKL \n"),
+			expected: S{"ABCD", "EFGH", "IJKL"},
+		},
+		{
+			name:     "Multi-byte characters",
+			raw:      []byte("ABCD ☃☃   EFG  \n"),
+			expected: S{"ABCD", "☃☃", "EFG"},
+		},
+		{
+			name:     "Truncated with multi-byte characters",
+			raw:      []byte("☃☃\n"),
+			expected: S{"☃☃", "", ""},
+		},
+		{
+			name:     "Multi-byte characters",
+			raw:      []byte("PIÑA DEFGHIJKLM"),
+			expected: S{"PIÑA", "DEFGH", "IJKLM"},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			d := NewDecoder(bytes.NewReader(tt.raw))
+			d.SetUseCodepointIndices(true)
+			var s S
+			err := d.Decode(&s)
+			if err != nil {
+				t.Errorf("Unexpected err: %v", err)
+			}
+			if !reflect.DeepEqual(tt.expected, s) {
+				t.Errorf("Decode(%v) want %v, have %v", tt.raw, tt.expected, s)
+			}
+		})
+	}
+
 }
 
 // Verify the behavior of Decoder.Decode at the end of a file. See
@@ -248,5 +297,38 @@ func TestDecode_EOF(t *testing.T) {
 	err = d.Decode(&s)
 	if err != io.EOF {
 		t.Errorf("Decode should have returned an EOF error. Returned: %v", err)
+	}
+}
+
+func TestNewRawValue(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		input    []byte
+		expected []int
+	}{
+		{
+			name:     "All ASCII",
+			input:    []byte("ABC"),
+			expected: []int(nil),
+		},
+		{
+			name:     "All multi-byte",
+			input:    []byte("☃☃☃"),
+			expected: []int{0, 3, 6},
+		},
+		{
+			name:     "Mixed",
+			input:    []byte("abc☃☃☃123"),
+			expected: []int{0, 1, 2, 3, 6, 9, 12, 13, 14},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := newRawValue(tt.input, true)
+			if err != nil {
+				t.Errorf("newRawValue(%v, true): Unexpected error", tt.input)
+			} else if !reflect.DeepEqual(tt.expected, result.codepointIndices) {
+				t.Errorf("newRawValue(%v, true): Unexpected result, expected %v got %v", tt.input, tt.expected, result.codepointIndices)
+			}
+		})
 	}
 }
