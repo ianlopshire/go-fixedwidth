@@ -141,7 +141,6 @@ func newRawLine(bytes []byte, useCodepointIndices bool) (rawLine, error) {
 	}
 	if useCodepointIndices {
 		bytesIdx := 0
-		codepointIdx := 0
 		// Lazily allocate this only if the line actually contains a multi-byte
 		// character.
 		codepointIndices := []int(nil)
@@ -162,7 +161,6 @@ func newRawLine(bytes []byte, useCodepointIndices bool) (rawLine, error) {
 				codepointIndices = append(codepointIndices, bytesIdx)
 			}
 			bytesIdx += codepointSize
-			codepointIdx += 1
 		}
 		line.codepointIndices = codepointIndices
 	}
