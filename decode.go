@@ -126,7 +126,7 @@ func (d *Decoder) readLines(v reflect.Value) (err error) {
 	return nil
 }
 
-type rawLine struct {
+type rawValue struct {
 	bytes []byte
 	// Used when `SetUseCodepointIndices` has been called on `Decoder`. A
 	// mapping of codepoint indices into the bytes. So the
@@ -135,19 +135,19 @@ type rawLine struct {
 	codepointIndices []int
 }
 
-func newRawLine(bytes []byte, useCodepointIndices bool) (rawLine, error) {
-	line := rawLine{
+func newRawValue(bytes []byte, useCodepointIndices bool) (rawValue, error) {
+	value := rawValue{
 		bytes: bytes,
 	}
 	if useCodepointIndices {
 		bytesIdx := 0
-		// Lazily allocate this only if the line actually contains a multi-byte
-		// character.
+		// Lazily allocate this only if the value actually contains a
+		// multi-byte character.
 		codepointIndices := []int(nil)
 		for bytesIdx < len(bytes) {
 			_, codepointSize := utf8.DecodeRune(bytes[bytesIdx:])
 			if codepointSize == 0 {
-				return rawLine{}, errors.New("fixedwidth: Invalid codepoint")
+				return rawValue{}, errors.New("fixedwidth: Invalid codepoint")
 			}
 			// We have a multi-byte codepoint, we need to allocate
 			// codepointIndices
@@ -162,9 +162,9 @@ func newRawLine(bytes []byte, useCodepointIndices bool) (rawLine, error) {
 			}
 			bytesIdx += codepointSize
 		}
-		line.codepointIndices = codepointIndices
+		value.codepointIndices = codepointIndices
 	}
-	return line, nil
+	return value, nil
 }
 
 func (d *Decoder) readLine(v reflect.Value) (err error, ok bool) {
@@ -181,45 +181,45 @@ func (d *Decoder) readLine(v reflect.Value) (err error, ok bool) {
 			return nil, false
 		}
 	}
-	rawLine, err := newRawLine(line, d.useCodepointIndices)
+	rawValue, err := newRawValue(line, d.useCodepointIndices)
 	if err != nil {
 		return
 	}
-	return newValueSetter(v.Type())(v, rawLine), true
+	return newValueSetter(v.Type())(v, rawValue), true
 }
 
-func rawValueFromLine(line rawLine, startPos, endPos int) rawLine {
-	if line.codepointIndices != nil {
-		if len(line.codepointIndices) == 0 || startPos > len(line.codepointIndices) {
-			return rawLine{bytes: []byte{}}
+func rawValueFromLine(value rawValue, startPos, endPos int) rawValue {
+	if value.codepointIndices != nil {
+		if len(value.codepointIndices) == 0 || startPos > len(value.codepointIndices) {
+			return rawValue{bytes: []byte{}}
 		}
 		var relevantIndices []int
 		var lineBytes []byte
-		if endPos >= len(line.codepointIndices) {
-			relevantIndices = line.codepointIndices[startPos-1:]
-			lineBytes = line.bytes[relevantIndices[0]:]
+		if endPos >= len(value.codepointIndices) {
+			relevantIndices = value.codepointIndices[startPos-1:]
+			lineBytes = value.bytes[relevantIndices[0]:]
 		} else {
-			relevantIndices = line.codepointIndices[startPos-1 : endPos]
-			lineBytes = line.bytes[relevantIndices[0]:line.codepointIndices[endPos]]
+			relevantIndices = value.codepointIndices[startPos-1 : endPos]
+			lineBytes = value.bytes[relevantIndices[0]:value.codepointIndices[endPos]]
 		}
-		return rawLine{
+		return rawValue{
 			bytes:            bytes.TrimSpace(lineBytes),
 			codepointIndices: relevantIndices,
 		}
 	} else {
-		if len(line.bytes) == 0 || startPos > len(line.bytes) {
-			return rawLine{bytes: []byte{}}
+		if len(value.bytes) == 0 || startPos > len(value.bytes) {
+			return rawValue{bytes: []byte{}}
 		}
-		if endPos > len(line.bytes) {
-			endPos = len(line.bytes)
+		if endPos > len(value.bytes) {
+			endPos = len(value.bytes)
 		}
-		return rawLine{
-			bytes: bytes.TrimSpace(line.bytes[startPos-1 : endPos]),
+		return rawValue{
+			bytes: bytes.TrimSpace(value.bytes[startPos-1 : endPos]),
 		}
 	}
 }
 
-type valueSetter func(v reflect.Value, raw rawLine) error
+type valueSetter func(v reflect.Value, raw rawValue) error
 
 var textUnmarshalerType = reflect.TypeOf(new(encoding.TextUnmarshaler)).Elem()
 
@@ -250,7 +250,7 @@ func newValueSetter(t reflect.Type) valueSetter {
 	return unknownSetter
 }
 
-func structSetter(v reflect.Value, raw rawLine) error {
+func structSetter(v reflect.Value, raw rawValue) error {
 	t := v.Type()
 	for i := 0; i < v.NumField(); i++ {
 		fv := v.Field(i)
@@ -271,17 +271,17 @@ func structSetter(v reflect.Value, raw rawLine) error {
 	return nil
 }
 
-func unknownSetter(v reflect.Value, raw rawLine) error {
+func unknownSetter(v reflect.Value, raw rawValue) error {
 	return errors.New("fixedwidth: unknown type")
 }
 
-func nilSetter(v reflect.Value, _ rawLine) error {
+func nilSetter(v reflect.Value, _ rawValue) error {
 	v.Set(reflect.Zero(v.Type()))
 	return nil
 }
 
 func textUnmarshalerSetter(t reflect.Type, shouldAddr bool) valueSetter {
-	return func(v reflect.Value, raw rawLine) error {
+	return func(v reflect.Value, raw rawValue) error {
 		if shouldAddr {
 			v = v.Addr()
 		}
@@ -293,12 +293,12 @@ func textUnmarshalerSetter(t reflect.Type, shouldAddr bool) valueSetter {
 	}
 }
 
-func interfaceSetter(v reflect.Value, raw rawLine) error {
+func interfaceSetter(v reflect.Value, raw rawValue) error {
 	return newValueSetter(v.Elem().Type())(v.Elem(), raw)
 }
 
 func ptrSetter(t reflect.Type) valueSetter {
-	return func(v reflect.Value, raw rawLine) error {
+	return func(v reflect.Value, raw rawValue) error {
 		if len(raw.bytes) <= 0 {
 			return nilSetter(v, raw)
 		}
@@ -309,12 +309,12 @@ func ptrSetter(t reflect.Type) valueSetter {
 	}
 }
 
-func stringSetter(v reflect.Value, raw rawLine) error {
+func stringSetter(v reflect.Value, raw rawValue) error {
 	v.SetString(string(raw.bytes))
 	return nil
 }
 
-func intSetter(v reflect.Value, raw rawLine) error {
+func intSetter(v reflect.Value, raw rawValue) error {
 	if len(raw.bytes) < 1 {
 		return nil
 	}
@@ -327,7 +327,7 @@ func intSetter(v reflect.Value, raw rawLine) error {
 }
 
 func floatSetter(bitSize int) valueSetter {
-	return func(v reflect.Value, raw rawLine) error {
+	return func(v reflect.Value, raw rawValue) error {
 		if len(raw.bytes) < 1 {
 			return nil
 		}

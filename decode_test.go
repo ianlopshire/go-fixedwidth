@@ -211,7 +211,7 @@ func TestNewValueSetter(t *testing.T) {
 			// ensure we have an addressable target
 			var i = reflect.Indirect(reflect.New(reflect.TypeOf(tt.expected)))
 
-			err := newValueSetter(i.Type())(i, rawLine{bytes: tt.raw})
+			err := newValueSetter(i.Type())(i, rawValue{bytes: tt.raw})
 			if tt.shouldErr != (err != nil) {
 				t.Errorf("newValueSetter(%s)() err want %v, have %v (%v)", reflect.TypeOf(tt.expected).Name(), tt.shouldErr, err != nil, err.Error())
 			}
@@ -300,7 +300,7 @@ func TestDecode_EOF(t *testing.T) {
 	}
 }
 
-func TestNewRawLine(t *testing.T) {
+func TestNewRawValue(t *testing.T) {
 	for _, tt := range []struct {
 		name     string
 		input    []byte
@@ -323,11 +323,11 @@ func TestNewRawLine(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := newRawLine(tt.input, true)
+			result, err := newRawValue(tt.input, true)
 			if err != nil {
-				t.Errorf("newRawLine(%v, true): Unexpected error", tt.input)
+				t.Errorf("newRawValue(%v, true): Unexpected error", tt.input)
 			} else if !reflect.DeepEqual(tt.expected, result.codepointIndices) {
-				t.Errorf("newRawLine(%v, true): Unexpected result, expected %v got %v", tt.input, tt.expected, result.codepointIndices)
+				t.Errorf("newRawValue(%v, true): Unexpected result, expected %v got %v", tt.input, tt.expected, result.codepointIndices)
 			}
 		})
 	}
