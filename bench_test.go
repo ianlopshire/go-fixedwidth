@@ -51,6 +51,26 @@ func BenchmarkUnmarshal_MixedData_100000(b *testing.B) {
 	}
 }
 
+func BenchmarkDecode_CodePoints_MixedData_1_Ascii(b *testing.B) {
+	data := []byte(`       foo       foo        42        42        42        42        42        42        42        42       4.2       4.2       4.2       4.2`)
+	var v mixedData
+	for i := 0; i < b.N; i++ {
+		d := NewDecoder(bytes.NewReader(data))
+		d.SetUseCodepointIndices(true)
+		_ = d.Decode(&v)
+	}
+}
+
+func BenchmarkDecode_CodePoints_MixedData_1_UTF8(b *testing.B) {
+	data := []byte(`       f☃☃       f☃☃        42        42        42        42        42        42        42        42       4.2       4.2       4.2       4.2`)
+	var v mixedData
+	for i := 0; i < b.N; i++ {
+		d := NewDecoder(bytes.NewReader(data))
+		d.SetUseCodepointIndices(true)
+		_ = d.Decode(&v)
+	}
+}
+
 func BenchmarkUnmarshal_String(b *testing.B) {
 	data := []byte(`foo       `)
 	var v struct {
