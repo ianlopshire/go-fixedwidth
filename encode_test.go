@@ -48,7 +48,9 @@ func TestMarshal(t *testing.T) {
 		shouldErr bool
 	}{
 		{"single line", H{"foo", 1}, []byte("foo  1    "), false},
+		{"single line - unicode", H{"fôô", 1}, []byte("fôô  1    "), false},
 		{"multiple line", []H{{"foo", 1}, {"bar", 2}}, []byte("foo  1    \nbar  2    "), false},
+		{"multiple line - unicode", []H{{"fôô", 1}, {"bâr", 2}}, []byte("fôô  1    \nbâr  2    "), false},
 		{"empty slice", []H{}, nil, false},
 		{"pointer", &H{"foo", 1}, []byte("foo  1    "), false},
 		{"nil", nil, nil, false},

@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"strconv"
 	"sync"
+	"unicode/utf8"
 )
 
 // Marshal returns the fixed-width encoding of v.
@@ -150,20 +151,69 @@ func newValueEncoder(t reflect.Type) valueEncoder {
 
 func structEncoder(v reflect.Value) ([]byte, error) {
 	ss := cachedStructSpec(v.Type())
-	dst := bytes.Repeat([]byte(" "), ss.ll)
+	dst := bytes.Repeat([]byte(" "), ss.ll*utf8.UTFMax)
+	size := 0
 
 	for i, spec := range ss.fieldSpecs {
 		if !spec.ok {
 			continue
 		}
 
-		val, err := newValueEncoder(v.Field(i).Type())(v.Field(i))
+		f := v.Field(i)
+		val, err := newValueEncoder(f.Type())(f)
 		if err != nil {
 			return nil, err
 		}
-		copy(dst[spec.startPos-1:spec.endPos:spec.endPos], val)
+
+		val, padding := getValidChunk(val, f.Kind(), spec.startPos, spec.endPos)
+		copy(dst[size:size+len(val)], val)
+		size += len(val) + padding
 	}
-	return dst, nil
+
+	return dst[:size], nil
+}
+
+// getValidChunk gets the valid chunk from field value base on start and end position
+// number of additional spaces will be returned if the chunk doesn't fullfill defined storage
+func getValidChunk(val []byte, kind reflect.Kind, startPos, endPos int) ([]byte, int) {
+	if endPos < startPos {
+		return val, 0
+	}
+
+	numberOfRunes := endPos - startPos + 1
+
+	if kindIsNumber(kind) {
+		return val, numberOfRunes - len(val)
+	}
+
+	temp := val
+	size := 0
+	numberOfPadding := 0
+
+	for numberOfRunes > 0 {
+		if len(temp) == 0 {
+			numberOfPadding++
+			numberOfRunes--
+			continue
+		}
+
+		_, s := utf8.DecodeRune(temp)
+		size += s
+		temp = temp[s:]
+		numberOfRunes--
+	}
+
+	return val[:size], numberOfPadding
+}
+
+// kindIsNumber check if kind k is a number (int, uint, ...)
+func kindIsNumber(k reflect.Kind) bool {
+	switch k {
+	case reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8, reflect.Float32, reflect.Float64, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return true
+	default:
+		return false
+	}
 }
 
 type structSpec struct {
