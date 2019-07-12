@@ -23,6 +23,7 @@ type mixedData struct {
 }
 
 var mixedDataInstance = mixedData{"foo", stringp("foo"), 42, int64p(42), 42, int32p(42), 42, int16p(42), 42, int8p(42), 4.2, float64p(4.2), 4.2} //,float32p(4.2)}
+var mixedDataWithUnicodeInstance = mixedData{"f☃☃", stringp("f☃☃"), 42, int64p(42), 42, int32p(42), 42, int16p(42), 42, int8p(42), 4.2, float64p(4.2), 4.2}
 
 func BenchmarkUnmarshal_MixedData_1(b *testing.B) {
 	data := []byte(`       foo       foo        42        42        42        42        42        42        42        42       4.2       4.2       4.2       4.2`)
@@ -140,6 +141,37 @@ func BenchmarkMarshal_MixedData_100000(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		Marshal(v)
+	}
+}
+
+func BenchmarkEncode_Codepoint_MixedData_1(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		e := NewEncoder(&bytes.Buffer{})
+		e.Encode(mixedDataWithUnicodeInstance)
+	}
+}
+
+func BenchmarkEncode_Codepoint_MixedData_1000(b *testing.B) {
+	v := make([]mixedData, 1000)
+	for i := range v {
+		v[i] = mixedDataWithUnicodeInstance
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		e := NewEncoder(&bytes.Buffer{})
+		e.Encode(v)
+	}
+}
+
+func BenchmarkEncode_Codepoint_MixedData_100000(b *testing.B) {
+	v := make([]mixedData, 100000)
+	for i := range v {
+		v[i] = mixedDataWithUnicodeInstance
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		e := NewEncoder(&bytes.Buffer{})
+		e.Encode(v)
 	}
 }
 

@@ -59,14 +59,22 @@ func (e *MarshalInvalidTypeError) Error() string {
 // An Encoder writes fixed-width formatted data to an output
 // stream.
 type Encoder struct {
-	w *bufio.Writer
+	w                   *bufio.Writer
+	useCodepointIndices bool
 }
 
 // NewEncoder returns a new encoder that writes to w.
 func NewEncoder(w io.Writer) *Encoder {
 	return &Encoder{
-		bufio.NewWriter(w),
+		w: bufio.NewWriter(w),
 	}
+}
+
+// SetUseCodepointIndices configures `Encoder` on whether the indices in the
+// `fixedwidth` struct tags are expressed in terms of bytes (the default
+// behavior) or in terms of UTF-8 decoded codepoints.
+func (e *Encoder) SetUseCodepointIndices(use bool) {
+	e.useCodepointIndices = use
 }
 
 // Encode writes the fixed-width encoding of v to the
@@ -114,7 +122,7 @@ func (e *Encoder) writeLines(v reflect.Value) error {
 }
 
 func (e *Encoder) writeLine(v reflect.Value) (err error) {
-	b, err := newValueEncoder(v.Type())(v)
+	b, err := newValueEncoder(v.Type())(v, e.useCodepointIndices)
 	if err != nil {
 		return err
 	}
@@ -122,7 +130,7 @@ func (e *Encoder) writeLine(v reflect.Value) (err error) {
 	return err
 }
 
-type valueEncoder func(v reflect.Value) ([]byte, error)
+type valueEncoder func(v reflect.Value, useCodepointIndices bool) ([]byte, error)
 
 func newValueEncoder(t reflect.Type) valueEncoder {
 	if t == nil {
@@ -149,10 +157,16 @@ func newValueEncoder(t reflect.Type) valueEncoder {
 	return unknownTypeEncoder(t)
 }
 
-func structEncoder(v reflect.Value) ([]byte, error) {
+func structEncoder(v reflect.Value, useCodepointIndices bool) ([]byte, error) {
 	ss := cachedStructSpec(v.Type())
-	dst := bytes.Repeat([]byte(" "), ss.ll*utf8.UTFMax)
-	size := 0
+	size := ss.ll
+	factor := 1
+	if useCodepointIndices {
+		factor = utf8.UTFMax
+		size = 0
+	}
+
+	dst := bytes.Repeat([]byte(" "), ss.ll*factor)
 
 	for i, spec := range ss.fieldSpecs {
 		if !spec.ok {
@@ -160,14 +174,18 @@ func structEncoder(v reflect.Value) ([]byte, error) {
 		}
 
 		f := v.Field(i)
-		val, err := newValueEncoder(f.Type())(f)
+		val, err := newValueEncoder(f.Type())(f, useCodepointIndices)
 		if err != nil {
 			return nil, err
 		}
 
-		val, padding := getValidChunk(val, f.Kind(), spec.startPos, spec.endPos)
-		copy(dst[size:size+len(val)], val)
-		size += len(val) + padding
+		if useCodepointIndices {
+			val, padding := getValidChunk(val, f.Kind(), spec.startPos, spec.endPos)
+			copy(dst[size:size+len(val)], val)
+			size += len(val) + padding
+		} else {
+			copy(dst[spec.startPos-1:spec.endPos], val)
+		}
 	}
 
 	return dst[:size], nil
@@ -251,37 +269,37 @@ func cachedStructSpec(t reflect.Type) structSpec {
 	return f.(structSpec)
 }
 
-func textMarshalerEncoder(v reflect.Value) ([]byte, error) {
+func textMarshalerEncoder(v reflect.Value, _ bool) ([]byte, error) {
 	return v.Interface().(encoding.TextMarshaler).MarshalText()
 }
 
-func ptrInterfaceEncoder(v reflect.Value) ([]byte, error) {
+func ptrInterfaceEncoder(v reflect.Value, useCodepointIndices bool) ([]byte, error) {
 	if v.IsNil() {
-		return nilEncoder(v)
+		return nilEncoder(v, useCodepointIndices)
 	}
-	return newValueEncoder(v.Elem().Type())(v.Elem())
+	return newValueEncoder(v.Elem().Type())(v.Elem(), useCodepointIndices)
 }
 
-func stringEncoder(v reflect.Value) ([]byte, error) {
+func stringEncoder(v reflect.Value, _ bool) ([]byte, error) {
 	return []byte(v.String()), nil
 }
 
-func intEncoder(v reflect.Value) ([]byte, error) {
+func intEncoder(v reflect.Value, _ bool) ([]byte, error) {
 	return []byte(strconv.Itoa(int(v.Int()))), nil
 }
 
 func floatEncoder(perc, bitSize int) valueEncoder {
-	return func(v reflect.Value) ([]byte, error) {
+	return func(v reflect.Value, useCodepointIndices bool) ([]byte, error) {
 		return []byte(strconv.FormatFloat(v.Float(), 'f', perc, bitSize)), nil
 	}
 }
 
-func nilEncoder(v reflect.Value) ([]byte, error) {
+func nilEncoder(_ reflect.Value, _ bool) ([]byte, error) {
 	return nil, nil
 }
 
 func unknownTypeEncoder(t reflect.Type) valueEncoder {
-	return func(value reflect.Value) ([]byte, error) {
+	return func(value reflect.Value, useCodepointIndices bool) ([]byte, error) {
 		return nil, &MarshalInvalidTypeError{typeName: t.Name()}
 	}
 }

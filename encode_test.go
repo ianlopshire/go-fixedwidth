@@ -48,9 +48,7 @@ func TestMarshal(t *testing.T) {
 		shouldErr bool
 	}{
 		{"single line", H{"foo", 1}, []byte("foo  1    "), false},
-		{"single line - unicode", H{"fôô", 1}, []byte("fôô  1    "), false},
 		{"multiple line", []H{{"foo", 1}, {"bar", 2}}, []byte("foo  1    \nbar  2    "), false},
-		{"multiple line - unicode", []H{{"fôô", 1}, {"bâr", 2}}, []byte("fôô  1    \nbâr  2    "), false},
 		{"empty slice", []H{}, nil, false},
 		{"pointer", &H{"foo", 1}, []byte("foo  1    "), false},
 		{"nil", nil, nil, false},
@@ -118,12 +116,59 @@ func TestNewValueEncoder(t *testing.T) {
 		{"TextUnmarshaler error", EncodableString{"foo", errors.New("TextUnmarshaler error")}, []byte("foo"), true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			o, err := newValueEncoder(reflect.TypeOf(tt.i))(reflect.ValueOf(tt.i))
+			o, err := newValueEncoder(reflect.TypeOf(tt.i))(reflect.ValueOf(tt.i), false)
 			if tt.shouldErr != (err != nil) {
 				t.Errorf("newValueEncoder(%s)() shouldErr expected %v, have %v (%v)", reflect.TypeOf(tt.i).Name(), tt.shouldErr, err != nil, err)
 			}
 			if !tt.shouldErr && !bytes.Equal(o, tt.o) {
 				t.Errorf("newValueEncoder(%s)() expected %v, have %v", reflect.TypeOf(tt.i).Name(), tt.o, o)
+			}
+		})
+	}
+}
+
+func TestEncodeSetUseCodepointIndices(t *testing.T) {
+	type people struct {
+		ID        int     `fixed:"1,5"`
+		FirstName string  `fixed:"6,15"`
+		LastName  string  `fixed:"16,25"`
+		Grade     float64 `fixed:"26,30"`
+	}
+
+	tests := []struct {
+		name       string
+		p          people
+		wantOutput []byte
+	}{
+		{
+			name: "ASCII",
+			p: people{
+				ID:        1,
+				FirstName: "Ian",
+				LastName:  "Lopshire",
+				Grade:     9.2,
+			},
+			wantOutput: []byte("1    Ian       Lopshire  9.20 "),
+		},
+		{
+			name: "Unicode",
+			p: people{
+				ID:        1,
+				FirstName: "Íân",
+				LastName:  "Lôpshirê",
+				Grade:     9.2,
+			},
+			wantOutput: []byte("1    Íân       Lôpshirê  9.20 "),
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var b bytes.Buffer
+			encoder := NewEncoder(&b)
+			encoder.SetUseCodepointIndices(true)
+			encoder.Encode(test.p)
+			if !bytes.Equal(b.Bytes(), test.wantOutput) {
+				t.Errorf("Expected %v, have %v", test.wantOutput, b.Bytes())
 			}
 		})
 	}
