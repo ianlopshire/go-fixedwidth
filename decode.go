@@ -252,18 +252,14 @@ func newValueSetter(t reflect.Type) valueSetter {
 
 func structSetter(v reflect.Value, raw rawValue) error {
 	t := v.Type()
-	for i := 0; i < v.NumField(); i++ {
-		fv := v.Field(i)
-		if !fv.IsValid() {
+	spec := cachedStructSpec(t)
+	for i, fieldSpec := range spec.fieldSpecs {
+		if !fieldSpec.ok {
 			continue
 		}
 		sf := t.Field(i)
-		startPos, endPos, ok := parseTag(sf.Tag.Get("fixed"))
-		if !ok {
-			continue
-		}
-		rawValue := rawValueFromLine(raw, startPos, endPos)
-		err := newValueSetter(sf.Type)(fv, rawValue)
+		rawValue := rawValueFromLine(raw, fieldSpec.startPos, fieldSpec.endPos)
+		err := newValueSetter(sf.Type)(v.Field(i), rawValue)
 		if err != nil {
 			return &UnmarshalTypeError{string(rawValue.bytes), sf.Type, t.Name(), sf.Name, err}
 		}
