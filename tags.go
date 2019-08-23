@@ -37,6 +37,8 @@ type structSpec struct {
 
 type fieldSpec struct {
 	startPos, endPos int
+	encoder          valueEncoder
+	setter           valueSetter
 	ok               bool
 }
 
@@ -50,6 +52,8 @@ func buildStructSpec(t reflect.Type) structSpec {
 		if ss.fieldSpecs[i].endPos > ss.ll {
 			ss.ll = ss.fieldSpecs[i].endPos
 		}
+		ss.fieldSpecs[i].encoder = newValueEncoder(f.Type)
+		ss.fieldSpecs[i].setter = newValueSetter(f.Type)
 	}
 	return ss
 }
