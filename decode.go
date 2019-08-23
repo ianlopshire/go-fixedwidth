@@ -257,10 +257,10 @@ func structSetter(v reflect.Value, raw rawValue) error {
 		if !fieldSpec.ok {
 			continue
 		}
-		sf := t.Field(i)
 		rawValue := rawValueFromLine(raw, fieldSpec.startPos, fieldSpec.endPos)
-		err := newValueSetter(sf.Type)(v.Field(i), rawValue)
+		err := fieldSpec.setter(v.Field(i), rawValue)
 		if err != nil {
+			sf := t.Field(i)
 			return &UnmarshalTypeError{string(rawValue.bytes), sf.Type, t.Name(), sf.Name, err}
 		}
 	}

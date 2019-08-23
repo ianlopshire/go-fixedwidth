@@ -156,7 +156,7 @@ func structEncoder(v reflect.Value) ([]byte, error) {
 			continue
 		}
 
-		val, err := newValueEncoder(v.Field(i).Type())(v.Field(i))
+		val, err := spec.encoder(v.Field(i))
 		if err != nil {
 			return nil, err
 		}
