@@ -203,7 +203,7 @@ func rawValueFromLine(value rawValue, startPos, endPos int) rawValue {
 			lineBytes = value.bytes[relevantIndices[0]:value.codepointIndices[endPos]]
 		}
 		return rawValue{
-			bytes:            bytes.TrimSpace(lineBytes),
+			bytes:            trimSpace(lineBytes),
 			codepointIndices: relevantIndices,
 		}
 	} else {
@@ -214,9 +214,41 @@ func rawValueFromLine(value rawValue, startPos, endPos int) rawValue {
 			endPos = len(value.bytes)
 		}
 		return rawValue{
-			bytes: bytes.TrimSpace(value.bytes[startPos-1 : endPos]),
+			bytes: trimSpace(value.bytes[startPos-1 : endPos]),
 		}
 	}
+}
+
+func isAsciiSpace(b byte) bool {
+	switch b {
+	case ' ', '\t', '\n', '\r', '\f', '\v':
+		return true
+	}
+	return false
+}
+
+// Same as bytes.TrimSpace, but optimized for data that is all ASCII
+func trimSpace(data []byte) []byte {
+	for len(data) > 0 {
+		if data[0]&0x80 == 0x80 {
+			return bytes.TrimSpace(data)
+		}
+		if !isAsciiSpace(data[0]) {
+			break
+		}
+		data = data[1:]
+	}
+
+	for len(data) > 0 {
+		if data[len(data)-1]&0x80 == 0x80 {
+			return bytes.TrimSpace(data)
+		}
+		if !isAsciiSpace(data[len(data)-1]) {
+			break
+		}
+		data = data[:len(data)-1]
+	}
+	return data
 }
 
 type valueSetter func(v reflect.Value, raw rawValue) error
