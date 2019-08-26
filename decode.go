@@ -294,6 +294,7 @@ func interfaceSetter(v reflect.Value, raw rawValue) error {
 }
 
 func ptrSetter(t reflect.Type) valueSetter {
+	innerSetter := newValueSetter(t.Elem())
 	return func(v reflect.Value, raw rawValue) error {
 		if len(raw.bytes) <= 0 {
 			return nilSetter(v, raw)
@@ -301,7 +302,7 @@ func ptrSetter(t reflect.Type) valueSetter {
 		if v.IsNil() {
 			v.Set(reflect.New(t.Elem()))
 		}
-		return newValueSetter(v.Elem().Type())(reflect.Indirect(v), raw)
+		return innerSetter(reflect.Indirect(v), raw)
 	}
 }
 
