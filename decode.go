@@ -94,11 +94,11 @@ func (d *Decoder) Decode(v interface{}) error {
 		return &InvalidUnmarshalError{reflect.TypeOf(v)}
 	}
 
-	if reflect.Indirect(reflect.ValueOf(v)).Kind() == reflect.Slice {
-		return d.readLines(reflect.ValueOf(v).Elem())
+	if reflect.Indirect(rv).Kind() == reflect.Slice {
+		return d.readLines(rv.Elem())
 	}
 
-	err, ok := d.readLine(reflect.ValueOf(v))
+	err, ok := d.readLine(rv)
 	if d.done && err == nil && !ok {
 		// d.done means we've reached the end of the file. err == nil && !ok
 		// indicates that there was no data to read, so we propagate an io.EOF
