@@ -95,10 +95,10 @@ func (d *Decoder) Decode(v interface{}) error {
 	}
 
 	if rv.Elem().Kind() == reflect.Slice {
-		return d.readLines(reflect.ValueOf(v).Elem())
+		return d.readLines(rv.Elem())
 	}
 
-	err, ok := d.readLine(reflect.ValueOf(v))
+	err, ok := d.readLine(rv)
 	if d.done && err == nil && !ok {
 		// d.done means we've reached the end of the file. err == nil && !ok
 		// indicates that there was no data to read, so we propagate an io.EOF
