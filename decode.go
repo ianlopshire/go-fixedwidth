@@ -94,7 +94,7 @@ func (d *Decoder) Decode(v interface{}) error {
 		return &InvalidUnmarshalError{reflect.TypeOf(v)}
 	}
 
-	if reflect.Indirect(reflect.ValueOf(v)).Kind() == reflect.Slice {
+	if rv.Elem().Kind() == reflect.Slice {
 		return d.readLines(reflect.ValueOf(v).Elem())
 	}
 
