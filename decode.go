@@ -140,31 +140,38 @@ func newRawValue(bytes []byte, useCodepointIndices bool) (rawValue, error) {
 		bytes: bytes,
 	}
 	if useCodepointIndices {
-		bytesIdx := 0
-		// Lazily allocate this only if the value actually contains a
-		// multi-byte character.
-		codepointIndices := []int(nil)
-		for bytesIdx < len(bytes) {
-			_, codepointSize := utf8.DecodeRune(bytes[bytesIdx:])
-			if codepointSize == 0 {
-				return rawValue{}, errors.New("fixedwidth: Invalid codepoint")
+		bytesIdx := findFirstMultiByteChar(bytes)
+		// If we've got multi-byte characters, fill in the rest of codepointIndices.
+		if bytesIdx < len(bytes) {
+			codepointIndices := make([]int, bytesIdx)
+			for i := 0; i < bytesIdx; i++ {
+				codepointIndices[i] = i
 			}
-			// We have a multi-byte codepoint, we need to allocate
-			// codepointIndices
-			if codepointIndices == nil && codepointSize > 1 {
-				codepointIndices = make([]int, bytesIdx)
-				for i := 0; i < bytesIdx; i++ {
-					codepointIndices[i] = i
+			for bytesIdx < len(bytes) {
+				_, codepointSize := utf8.DecodeRune(bytes[bytesIdx:])
+				if codepointSize == 0 {
+					return rawValue{}, errors.New("fixedwidth: Invalid codepoint")
 				}
-			}
-			if codepointIndices != nil {
 				codepointIndices = append(codepointIndices, bytesIdx)
+				bytesIdx += codepointSize
 			}
-			bytesIdx += codepointSize
+			value.codepointIndices = codepointIndices
 		}
-		value.codepointIndices = codepointIndices
 	}
 	return value, nil
+}
+
+// Scans bytes, looking for multi-byte characters, returns either the index of
+// the first multi-byte chracter or the length of the string if there are none.
+func findFirstMultiByteChar(bytes []byte) int {
+	for bytesIdx, b := range bytes {
+		// We have a multi-byte codepoint, we need to allocate
+		// codepointIndices
+		if b&0x80 == 0x80 {
+			return bytesIdx
+		}
+	}
+	return len(bytes)
 }
 
 func (d *Decoder) readLine(v reflect.Value) (err error, ok bool) {
