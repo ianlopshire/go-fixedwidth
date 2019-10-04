@@ -8,6 +8,7 @@ import (
 	"io"
 	"reflect"
 	"strconv"
+	"strings"
 	"unicode/utf8"
 )
 
@@ -130,7 +131,7 @@ func (d *Decoder) readLines(v reflect.Value) (err error) {
 }
 
 type rawValue struct {
-	bytes []byte
+	data string
 	// Used when `SetUseCodepointIndices` has been called on `Decoder`. A
 	// mapping of codepoint indices into the bytes. So the
 	// `codepointIndices[n]` is the starting position for the n-th codepoint in
@@ -138,20 +139,20 @@ type rawValue struct {
 	codepointIndices []int
 }
 
-func newRawValue(bytes []byte, useCodepointIndices bool) (rawValue, error) {
+func newRawValue(data string, useCodepointIndices bool) (rawValue, error) {
 	value := rawValue{
-		bytes: bytes,
+		data: data,
 	}
 	if useCodepointIndices {
-		bytesIdx := findFirstMultiByteChar(bytes)
+		bytesIdx := findFirstMultiByteChar(data)
 		// If we've got multi-byte characters, fill in the rest of codepointIndices.
-		if bytesIdx < len(bytes) {
+		if bytesIdx < len(data) {
 			codepointIndices := make([]int, bytesIdx)
 			for i := 0; i < bytesIdx; i++ {
 				codepointIndices[i] = i
 			}
-			for bytesIdx < len(bytes) {
-				_, codepointSize := utf8.DecodeRune(bytes[bytesIdx:])
+			for bytesIdx < len(data) {
+				_, codepointSize := utf8.DecodeRuneInString(data[bytesIdx:])
 				if codepointSize == 0 {
 					return rawValue{}, errors.New("fixedwidth: Invalid codepoint")
 				}
@@ -166,27 +167,26 @@ func newRawValue(bytes []byte, useCodepointIndices bool) (rawValue, error) {
 
 // Scans bytes, looking for multi-byte characters, returns either the index of
 // the first multi-byte chracter or the length of the string if there are none.
-func findFirstMultiByteChar(bytes []byte) int {
-	for bytesIdx, b := range bytes {
+func findFirstMultiByteChar(data string) int {
+	for i := 0; i < len(data); i++ {
 		// We have a multi-byte codepoint, we need to allocate
 		// codepointIndices
-		if b&0x80 == 0x80 {
-			return bytesIdx
+		if data[i]&0x80 == 0x80 {
+			return i
 		}
 	}
-	return len(bytes)
+	return len(data)
 }
 
 func (d *Decoder) readLine(v reflect.Value) (err error, ok bool) {
-	var line []byte
-	line, err = d.data.ReadBytes('\n')
+	line, err := d.data.ReadString('\n')
 	if err != nil && err != io.EOF {
 		return err, false
 	}
 	if err == io.EOF {
 		d.done = true
 
-		if line == nil || len(line) <= 0 || line[0] == '\n' {
+		if len(line) <= 0 || line[0] == '\n' {
 			// skip last empty lines
 			return nil, false
 		}
@@ -208,30 +208,30 @@ func (d *Decoder) readLine(v reflect.Value) (err error, ok bool) {
 func rawValueFromLine(value rawValue, startPos, endPos int) rawValue {
 	if value.codepointIndices != nil {
 		if len(value.codepointIndices) == 0 || startPos > len(value.codepointIndices) {
-			return rawValue{bytes: []byte{}}
+			return rawValue{data: ""}
 		}
 		var relevantIndices []int
-		var lineBytes []byte
+		var lineData string
 		if endPos >= len(value.codepointIndices) {
 			relevantIndices = value.codepointIndices[startPos-1:]
-			lineBytes = value.bytes[relevantIndices[0]:]
+			lineData = value.data[relevantIndices[0]:]
 		} else {
 			relevantIndices = value.codepointIndices[startPos-1 : endPos]
-			lineBytes = value.bytes[relevantIndices[0]:value.codepointIndices[endPos]]
+			lineData = value.data[relevantIndices[0]:value.codepointIndices[endPos]]
 		}
 		return rawValue{
-			bytes:            bytes.TrimSpace(lineBytes),
+			data:             strings.TrimSpace(lineData),
 			codepointIndices: relevantIndices,
 		}
 	} else {
-		if len(value.bytes) == 0 || startPos > len(value.bytes) {
-			return rawValue{bytes: []byte{}}
+		if len(value.data) == 0 || startPos > len(value.data) {
+			return rawValue{data: ""}
 		}
-		if endPos > len(value.bytes) {
-			endPos = len(value.bytes)
+		if endPos > len(value.data) {
+			endPos = len(value.data)
 		}
 		return rawValue{
-			bytes: bytes.TrimSpace(value.bytes[startPos-1 : endPos]),
+			data: strings.TrimSpace(value.data[startPos-1 : endPos]),
 		}
 	}
 }
@@ -278,7 +278,7 @@ func structSetter(t reflect.Type) valueSetter {
 			err := fieldSpec.setter(v.Field(i), rawValue)
 			if err != nil {
 				sf := t.Field(i)
-				return &UnmarshalTypeError{string(rawValue.bytes), sf.Type, t.Name(), sf.Name, err}
+				return &UnmarshalTypeError{raw.data, sf.Type, t.Name(), sf.Name, err}
 			}
 		}
 		return nil
@@ -303,7 +303,7 @@ func textUnmarshalerSetter(t reflect.Type, shouldAddr bool) valueSetter {
 		if t.Kind() == reflect.Ptr && v.IsNil() {
 			v.Set(reflect.New(t.Elem()))
 		}
-		return v.Interface().(encoding.TextUnmarshaler).UnmarshalText(raw.bytes)
+		return v.Interface().(encoding.TextUnmarshaler).UnmarshalText([]byte(raw.data))
 	}
 }
 
@@ -314,7 +314,7 @@ func interfaceSetter(v reflect.Value, raw rawValue) error {
 func ptrSetter(t reflect.Type) valueSetter {
 	innerSetter := newValueSetter(t.Elem())
 	return func(v reflect.Value, raw rawValue) error {
-		if len(raw.bytes) <= 0 {
+		if len(raw.data) <= 0 {
 			return nilSetter(v, raw)
 		}
 		if v.IsNil() {
@@ -325,15 +325,15 @@ func ptrSetter(t reflect.Type) valueSetter {
 }
 
 func stringSetter(v reflect.Value, raw rawValue) error {
-	v.SetString(string(raw.bytes))
+	v.SetString(raw.data)
 	return nil
 }
 
 func intSetter(v reflect.Value, raw rawValue) error {
-	if len(raw.bytes) < 1 {
+	if len(raw.data) < 1 {
 		return nil
 	}
-	i, err := strconv.Atoi(string(raw.bytes))
+	i, err := strconv.Atoi(raw.data)
 	if err != nil {
 		return err
 	}
@@ -343,10 +343,10 @@ func intSetter(v reflect.Value, raw rawValue) error {
 
 func floatSetter(bitSize int) valueSetter {
 	return func(v reflect.Value, raw rawValue) error {
-		if len(raw.bytes) < 1 {
+		if len(raw.data) < 1 {
 			return nil
 		}
-		f, err := strconv.ParseFloat(string(raw.bytes), bitSize)
+		f, err := strconv.ParseFloat(raw.data, bitSize)
 		if err != nil {
 			return err
 		}

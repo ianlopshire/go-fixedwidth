@@ -211,7 +211,7 @@ func TestNewValueSetter(t *testing.T) {
 			// ensure we have an addressable target
 			var i = reflect.Indirect(reflect.New(reflect.TypeOf(tt.expected)))
 
-			err := newValueSetter(i.Type())(i, rawValue{bytes: tt.raw})
+			err := newValueSetter(i.Type())(i, rawValue{data: string(tt.raw)})
 			if tt.shouldErr != (err != nil) {
 				t.Errorf("newValueSetter(%s)() err want %v, have %v (%v)", reflect.TypeOf(tt.expected).Name(), tt.shouldErr, err != nil, err.Error())
 			}
@@ -323,7 +323,7 @@ func TestNewRawValue(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := newRawValue(tt.input, true)
+			result, err := newRawValue(string(tt.input), true)
 			if err != nil {
 				t.Errorf("newRawValue(%v, true): Unexpected error", tt.input)
 			} else if !reflect.DeepEqual(tt.expected, result.codepointIndices) {
