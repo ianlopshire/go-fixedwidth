@@ -23,6 +23,9 @@ type Decoder struct {
 	data                *bufio.Reader
 	done                bool
 	useCodepointIndices bool
+
+	lastType       reflect.Type
+	lastValuSetter valueSetter
 }
 
 // NewDecoder returns a new decoder that reads from r.
@@ -192,7 +195,14 @@ func (d *Decoder) readLine(v reflect.Value) (err error, ok bool) {
 	if err != nil {
 		return
 	}
-	return newValueSetter(v.Type())(v, rawValue), true
+	t := v.Type()
+	if t == d.lastType {
+		return d.lastValuSetter(v, rawValue), true
+	}
+	valueSetter := newValueSetter(t)
+	d.lastType = t
+	d.lastValuSetter = valueSetter
+	return valueSetter(v, rawValue), true
 }
 
 func rawValueFromLine(value rawValue, startPos, endPos int) rawValue {
@@ -244,7 +254,7 @@ func newValueSetter(t reflect.Type) valueSetter {
 	case reflect.Interface:
 		return interfaceSetter
 	case reflect.Struct:
-		return structSetter
+		return structSetter(t)
 	case reflect.String:
 		return stringSetter
 	case reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8:
@@ -257,21 +267,22 @@ func newValueSetter(t reflect.Type) valueSetter {
 	return unknownSetter
 }
 
-func structSetter(v reflect.Value, raw rawValue) error {
-	t := v.Type()
+func structSetter(t reflect.Type) valueSetter {
 	spec := cachedStructSpec(t)
-	for i, fieldSpec := range spec.fieldSpecs {
-		if !fieldSpec.ok {
-			continue
+	return func(v reflect.Value, raw rawValue) error {
+		for i, fieldSpec := range spec.fieldSpecs {
+			if !fieldSpec.ok {
+				continue
+			}
+			rawValue := rawValueFromLine(raw, fieldSpec.startPos, fieldSpec.endPos)
+			err := fieldSpec.setter(v.Field(i), rawValue)
+			if err != nil {
+				sf := t.Field(i)
+				return &UnmarshalTypeError{string(rawValue.bytes), sf.Type, t.Name(), sf.Name, err}
+			}
 		}
-		rawValue := rawValueFromLine(raw, fieldSpec.startPos, fieldSpec.endPos)
-		err := fieldSpec.setter(v.Field(i), rawValue)
-		if err != nil {
-			sf := t.Field(i)
-			return &UnmarshalTypeError{string(rawValue.bytes), sf.Type, t.Name(), sf.Name, err}
-		}
+		return nil
 	}
-	return nil
 }
 
 func unknownSetter(v reflect.Value, raw rawValue) error {
