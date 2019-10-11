@@ -3,10 +3,11 @@ package fixedwidth
 import (
 	"bytes"
 	"fmt"
-	"github.com/pkg/errors"
 	"log"
 	"reflect"
 	"testing"
+
+	"github.com/pkg/errors"
 )
 
 func ExampleMarshal() {
@@ -124,5 +125,26 @@ func TestNewValueEncoder(t *testing.T) {
 				t.Errorf("newValueEncoder(%s)() expected %v, have %v", reflect.TypeOf(tt.i).Name(), tt.o, o)
 			}
 		})
+	}
+}
+
+func TestEncoder_SetLineTerminator(t *testing.T) {
+	buff := new(bytes.Buffer)
+	enc := NewEncoder(buff)
+	enc.SetLineTerminator([]byte{'\r', '\n'})
+
+	input := []interface{}{
+		EncodableString{"foo", nil},
+		EncodableString{"bar", nil},
+	}
+
+	err := enc.Encode(input)
+	if err != nil {
+		t.Fatal("Encode() unexpected error")
+	}
+
+	expected := []byte("foo\r\nbar")
+	if !bytes.Equal(expected, buff.Bytes()) {
+		t.Errorf("Encode() expected %q, have %q", expected, buff.Bytes())
 	}
 }

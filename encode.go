@@ -57,14 +57,23 @@ func (e *MarshalInvalidTypeError) Error() string {
 // An Encoder writes fixed-width formatted data to an output
 // stream.
 type Encoder struct {
-	w *bufio.Writer
+	w              *bufio.Writer
+	lineTerminator []byte
 }
 
 // NewEncoder returns a new encoder that writes to w.
 func NewEncoder(w io.Writer) *Encoder {
 	return &Encoder{
-		bufio.NewWriter(w),
+		w:              bufio.NewWriter(w),
+		lineTerminator: []byte("\n"),
 	}
+}
+
+// SetLineTerminator sets the character(s) that will be used to terminate lines.
+//
+// The default value is "\n".
+func (e *Encoder) SetLineTerminator(lineTerminator []byte) {
+	e.lineTerminator = lineTerminator
 }
 
 // Encode writes the fixed-width encoding of v to the
@@ -102,7 +111,7 @@ func (e *Encoder) writeLines(v reflect.Value) error {
 		}
 
 		if i != v.Len()-1 {
-			_, err := e.w.Write([]byte("\n"))
+			_, err := e.w.Write(e.lineTerminator)
 			if err != nil {
 				return err
 			}
