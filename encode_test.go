@@ -3,10 +3,12 @@ package fixedwidth
 import (
 	"bytes"
 	"fmt"
-	"github.com/pkg/errors"
+	"io"
 	"log"
 	"reflect"
 	"testing"
+
+	"github.com/pkg/errors"
 )
 
 func ExampleMarshal() {
@@ -122,6 +124,38 @@ func TestNewValueEncoder(t *testing.T) {
 			}
 			if !tt.shouldErr && !bytes.Equal(o, tt.o) {
 				t.Errorf("newValueEncoder(%s)() expected %v, have %v", reflect.TypeOf(tt.i).Name(), tt.o, o)
+			}
+		})
+	}
+}
+
+func TestEncoderWithMultipleLines(t *testing.T) {
+	input := []interface{}{
+		EncodableString{"foo", nil},
+		EncodableString{"bar", nil},
+	}
+
+	for _, tt := range []struct {
+		name       string
+		expected   string
+		newEncoder func(io.Writer) *Encoder
+	}{
+		{"default", "foo\nbar", func(w io.Writer) *Encoder { return NewEncoder(w) }},
+		{"default", "foo\r\nbar", func(w io.Writer) *Encoder {
+			enc := NewEncoder(w)
+			enc.LineEnd = []byte("\r\n")
+			return enc
+		}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			enc := tt.newEncoder(&buf)
+			err := enc.Encode(input)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if buf.String() != tt.expected {
+				t.Fatalf("unexpected output\nexpected: %q\nreceived: %q", tt.expected, buf.String())
 			}
 		})
 	}
