@@ -3,7 +3,6 @@ package fixedwidth
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"log"
 	"reflect"
 	"testing"
@@ -129,34 +128,23 @@ func TestNewValueEncoder(t *testing.T) {
 	}
 }
 
-func TestEncoderWithMultipleLines(t *testing.T) {
+func TestEncoder_SetLineTerminator(t *testing.T) {
+	buff := new(bytes.Buffer)
+	enc := NewEncoder(buff)
+	enc.SetLineTerminator([]byte{'\r', '\n'})
+
 	input := []interface{}{
 		EncodableString{"foo", nil},
 		EncodableString{"bar", nil},
 	}
 
-	for _, tt := range []struct {
-		name       string
-		expected   string
-		newEncoder func(io.Writer) *Encoder
-	}{
-		{"default", "foo\nbar", func(w io.Writer) *Encoder { return NewEncoder(w) }},
-		{"default", "foo\r\nbar", func(w io.Writer) *Encoder {
-			enc := NewEncoder(w)
-			enc.LineEnd = []byte("\r\n")
-			return enc
-		}},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			enc := tt.newEncoder(&buf)
-			err := enc.Encode(input)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if buf.String() != tt.expected {
-				t.Fatalf("unexpected output\nexpected: %q\nreceived: %q", tt.expected, buf.String())
-			}
-		})
+	err := enc.Encode(input)
+	if err != nil {
+		t.Fatal("Encode() unexpected error")
+	}
+
+	expected := []byte("foo\r\nbar")
+	if !bytes.Equal(expected, buff.Bytes()) {
+		t.Errorf("Encode() expected %q, have %q", expected, buff.Bytes())
 	}
 }
