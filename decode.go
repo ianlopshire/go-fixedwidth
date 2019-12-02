@@ -21,7 +21,8 @@ func Unmarshal(data []byte, v interface{}) error {
 
 // A Decoder reads and decodes fixed width data from an input stream.
 type Decoder struct {
-	data                *bufio.Reader
+	scanner             *bufio.Scanner
+	separator           string
 	done                bool
 	useCodepointIndices bool
 
@@ -31,9 +32,12 @@ type Decoder struct {
 
 // NewDecoder returns a new decoder that reads from r.
 func NewDecoder(r io.Reader) *Decoder {
-	return &Decoder{
-		data: bufio.NewReader(r),
+	dec := &Decoder{
+		scanner:   bufio.NewScanner(r),
+		separator: "",
 	}
+	dec.scanner.Split(dec.Scan)
+	return dec
 }
 
 // An InvalidUnmarshalError describes an invalid argument passed to Unmarshal.
@@ -178,19 +182,44 @@ func findFirstMultiByteChar(data string) int {
 	return len(data)
 }
 
-func (d *Decoder) readLine(v reflect.Value) (err error, ok bool) {
-	line, err := d.data.ReadString('\n')
-	if err != nil && err != io.EOF {
-		return err, false
-	}
-	if err == io.EOF {
-		d.done = true
+func (d *Decoder) SetSeparator(separator string) {
+	d.separator = separator
+}
 
-		if len(line) <= 0 || line[0] == '\n' {
-			// skip last empty lines
-			return nil, false
-		}
+func (d Decoder) Separator() string {
+	if d.separator != "" {
+		return d.separator
 	}
+
+	return "\n"
+}
+
+func (d *Decoder) Scan(data []byte, atEOF bool) (advance int, token []byte, err error) {
+	sep := []byte(d.Separator())
+	if atEOF && len(data) == 0 {
+		return 0, nil, nil
+	}
+	if i := bytes.Index(data, sep); i >= 0 {
+		// We have a full newline-terminated line.
+		return i + len(sep), data[0:i], nil
+	}
+	// If we're at EOF, we have a final, non-terminated line. Return it.
+	if atEOF {
+		return len(data), data, nil
+	}
+	// Request more data.
+	return 0, nil, nil
+}
+
+func (d *Decoder) readLine(v reflect.Value) (err error, ok bool) {
+	ok = d.scanner.Scan()
+	if !ok {
+		d.done = true
+		return nil, false
+	}
+
+	line := string(d.scanner.Bytes())
+
 	rawValue, err := newRawValue(line, d.useCodepointIndices)
 	if err != nil {
 		return
