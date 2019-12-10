@@ -342,12 +342,12 @@ func TestLineSeparator(t *testing.T) {
 		TextUnmarshaler EncodableString `fixed:"16,20"`
 	}
 	for _, tt := range []struct {
-		name      string
-		rawValue  []byte
-		target    interface{}
-		expected  interface{}
-		shouldErr bool
-		separator string
+		name           string
+		rawValue       []byte
+		target         interface{}
+		expected       interface{}
+		shouldErr      bool
+		lineTerminator []byte
 	}{
 		{
 			name:     "CR line endings",
@@ -357,8 +357,8 @@ func TestLineSeparator(t *testing.T) {
 				{"foo", 123, 1.2, EncodableString{"bar", nil}},
 				{"bar", 321, 2.1, EncodableString{"foo", nil}},
 			},
-			shouldErr: false,
-			separator: "",
+			shouldErr:      false,
+			lineTerminator: []byte{},
 		},
 		{
 			name:     "CR line endings",
@@ -368,8 +368,8 @@ func TestLineSeparator(t *testing.T) {
 				{"f\ro", 123, 1.2, EncodableString{"bar", nil}},
 				{"bar", 321, 2.1, EncodableString{"foo", nil}},
 			},
-			shouldErr: false,
-			separator: "\n",
+			shouldErr:      false,
+			lineTerminator: []byte("\n"),
 		},
 		{
 			name:     "CRLF line endings",
@@ -379,8 +379,8 @@ func TestLineSeparator(t *testing.T) {
 				{"f\no", 123, 1.2, EncodableString{"bar", nil}},
 				{"bar", 321, 2.1, EncodableString{"foo", nil}},
 			},
-			shouldErr: false,
-			separator: "\r\n",
+			shouldErr:      false,
+			lineTerminator: []byte("\r\n"),
 		},
 		{
 			name:     "LF line endings",
@@ -390,13 +390,13 @@ func TestLineSeparator(t *testing.T) {
 				{"f\no", 123, 1.2, EncodableString{"bar", nil}},
 				{"bar", 321, 2.1, EncodableString{"foo", nil}},
 			},
-			shouldErr: false,
-			separator: "\r",
+			shouldErr:      false,
+			lineTerminator: []byte("\r"),
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			dec := NewDecoder(bytes.NewReader(tt.rawValue))
-			dec.SetSeparator(tt.separator)
+			dec.SetLineTerminator(tt.lineTerminator)
 			err := dec.Decode(tt.target)
 			if tt.shouldErr != (err != nil) {
 				t.Errorf("Unmarshal() err want %v, have %v (%v)", tt.shouldErr, err != nil, err)

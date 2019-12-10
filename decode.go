@@ -22,7 +22,7 @@ func Unmarshal(data []byte, v interface{}) error {
 // A Decoder reads and decodes fixed width data from an input stream.
 type Decoder struct {
 	scanner             *bufio.Scanner
-	separator           string
+	lineTerminator      []byte
 	done                bool
 	useCodepointIndices bool
 
@@ -33,10 +33,10 @@ type Decoder struct {
 // NewDecoder returns a new decoder that reads from r.
 func NewDecoder(r io.Reader) *Decoder {
 	dec := &Decoder{
-		scanner:   bufio.NewScanner(r),
-		separator: "",
+		scanner:        bufio.NewScanner(r),
+		lineTerminator: []byte("\n"),
 	}
-	dec.scanner.Split(dec.Scan)
+	dec.scanner.Split(dec.scan)
 	return dec
 }
 
@@ -182,26 +182,22 @@ func findFirstMultiByteChar(data string) int {
 	return len(data)
 }
 
-func (d *Decoder) SetSeparator(separator string) {
-	d.separator = separator
-}
-
-func (d Decoder) Separator() string {
-	if d.separator != "" {
-		return d.separator
+// SetLineTerminator sets the character(s) that will be used to terminate lines.
+//
+// The default value is "\n".
+func (d *Decoder) SetLineTerminator(lineTerminator []byte) {
+	if len(lineTerminator) > 0 {
+		d.lineTerminator = lineTerminator
 	}
-
-	return "\n"
 }
 
-func (d *Decoder) Scan(data []byte, atEOF bool) (advance int, token []byte, err error) {
-	sep := []byte(d.Separator())
+func (d *Decoder) scan(data []byte, atEOF bool) (advance int, token []byte, err error) {
 	if atEOF && len(data) == 0 {
 		return 0, nil, nil
 	}
-	if i := bytes.Index(data, sep); i >= 0 {
+	if i := bytes.Index(data, d.lineTerminator); i >= 0 {
 		// We have a full newline-terminated line.
-		return i + len(sep), data[0:i], nil
+		return i + len(d.lineTerminator), data[0:i], nil
 	}
 	// If we're at EOF, we have a final, non-terminated line. Return it.
 	if atEOF {
