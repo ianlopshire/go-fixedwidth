@@ -332,3 +332,79 @@ func TestNewRawValue(t *testing.T) {
 		})
 	}
 }
+
+func TestLineSeparator(t *testing.T) {
+	// allTypes contains a field with all current supported types.
+	type allTypes struct {
+		String          string          `fixed:"1,5"`
+		Int             int             `fixed:"6,10"`
+		Float           float64         `fixed:"11,15"`
+		TextUnmarshaler EncodableString `fixed:"16,20"`
+	}
+	for _, tt := range []struct {
+		name           string
+		rawValue       []byte
+		target         interface{}
+		expected       interface{}
+		shouldErr      bool
+		lineTerminator []byte
+	}{
+		{
+			name:     "CR line endings",
+			rawValue: []byte("foo  123  1.2  bar" + "\n" + "bar  321  2.1  foo"),
+			target:   &[]allTypes{},
+			expected: &[]allTypes{
+				{"foo", 123, 1.2, EncodableString{"bar", nil}},
+				{"bar", 321, 2.1, EncodableString{"foo", nil}},
+			},
+			shouldErr:      false,
+			lineTerminator: []byte{},
+		},
+		{
+			name:     "CR line endings",
+			rawValue: []byte("f\ro  123  1.2  bar" + "\n" + "bar  321  2.1  foo"),
+			target:   &[]allTypes{},
+			expected: &[]allTypes{
+				{"f\ro", 123, 1.2, EncodableString{"bar", nil}},
+				{"bar", 321, 2.1, EncodableString{"foo", nil}},
+			},
+			shouldErr:      false,
+			lineTerminator: []byte("\n"),
+		},
+		{
+			name:     "CRLF line endings",
+			rawValue: []byte("f\no  123  1.2  bar" + "\r\n" + "bar  321  2.1  foo"),
+			target:   &[]allTypes{},
+			expected: &[]allTypes{
+				{"f\no", 123, 1.2, EncodableString{"bar", nil}},
+				{"bar", 321, 2.1, EncodableString{"foo", nil}},
+			},
+			shouldErr:      false,
+			lineTerminator: []byte("\r\n"),
+		},
+		{
+			name:     "LF line endings",
+			rawValue: []byte("f\no  123  1.2  bar" + "\r" + "bar  321  2.1  foo"),
+			target:   &[]allTypes{},
+			expected: &[]allTypes{
+				{"f\no", 123, 1.2, EncodableString{"bar", nil}},
+				{"bar", 321, 2.1, EncodableString{"foo", nil}},
+			},
+			shouldErr:      false,
+			lineTerminator: []byte("\r"),
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			dec := NewDecoder(bytes.NewReader(tt.rawValue))
+			dec.SetLineTerminator(tt.lineTerminator)
+			err := dec.Decode(tt.target)
+			if tt.shouldErr != (err != nil) {
+				t.Errorf("Unmarshal() err want %v, have %v (%v)", tt.shouldErr, err != nil, err)
+			}
+			if !tt.shouldErr && !reflect.DeepEqual(tt.target, tt.expected) {
+				t.Errorf("Unmarshal() want %+v, have %+v", tt.expected, tt.target)
+			}
+
+		})
+	}
+}
