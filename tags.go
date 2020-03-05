@@ -36,10 +36,18 @@ type structSpec struct {
 }
 
 type fieldSpec struct {
+	name             string
 	startPos, endPos int
 	encoder          valueEncoder
 	setter           valueSetter
 	ok               bool
+	isNumeric        bool
+	format           *fieldFormat
+}
+
+type fieldFormat struct {
+	rightAlign bool
+	padChar    byte
 }
 
 func buildStructSpec(t reflect.Type) structSpec {
@@ -54,6 +62,12 @@ func buildStructSpec(t reflect.Type) structSpec {
 		}
 		ss.fieldSpecs[i].encoder = newValueEncoder(f.Type)
 		ss.fieldSpecs[i].setter = newValueSetter(f.Type)
+		ss.fieldSpecs[i].name = f.Name
+
+		switch f.Type.Kind() {
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Float32, reflect.Float64:
+			ss.fieldSpecs[i].isNumeric = true
+		}
 	}
 	return ss
 }

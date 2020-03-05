@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding"
+	"fmt"
 	"io"
 	"reflect"
 	"strconv"
@@ -57,16 +58,48 @@ func (e *MarshalInvalidTypeError) Error() string {
 // An Encoder writes fixed-width formatted data to an output
 // stream.
 type Encoder struct {
-	w              *bufio.Writer
-	lineTerminator []byte
+	w               *bufio.Writer
+	lineTerminator  []byte
+	errorOnOverflow bool
+	numericFormat   *fieldFormat
 }
 
-// NewEncoder returns a new encoder that writes to w.
-func NewEncoder(w io.Writer) *Encoder {
-	return &Encoder{
+var defaultFormat = &fieldFormat{
+	rightAlign: false,
+	padChar:    byte(' '),
+}
+
+// EncoderOption is a constructor option affecting the behavior of the Encoder
+type EncoderOption func(enc *Encoder)
+
+// WithRightAlignedZeroPaddedNumbers will encode all ints/uints/floats right-aligned and zero-padded.
+func WithRightAlignedZeroPaddedNumbers() EncoderOption {
+	return func(enc *Encoder) {
+		enc.numericFormat = &fieldFormat{
+			rightAlign: true,
+			padChar:    byte('0'),
+		}
+	}
+}
+
+func WithOverflowErrors() EncoderOption {
+	return func(enc *Encoder) {
+		enc.errorOnOverflow = true
+	}
+}
+
+// NewEncoder returns a new encoder that writes to w, with optional options.
+func NewEncoder(w io.Writer, options ...EncoderOption) *Encoder {
+	enc := &Encoder{
 		w:              bufio.NewWriter(w),
 		lineTerminator: []byte("\n"),
 	}
+
+	for _, option := range options {
+		option(enc)
+	}
+
+	return enc
 }
 
 // SetLineTerminator sets the character(s) that will be used to terminate lines.
@@ -121,7 +154,7 @@ func (e *Encoder) writeLines(v reflect.Value) error {
 }
 
 func (e *Encoder) writeLine(v reflect.Value) (err error) {
-	b, err := newValueEncoder(v.Type())(v)
+	b, err := newValueEncoder(v.Type())(v, e)
 	if err != nil {
 		return err
 	}
@@ -129,7 +162,7 @@ func (e *Encoder) writeLine(v reflect.Value) (err error) {
 	return err
 }
 
-type valueEncoder func(v reflect.Value) ([]byte, error)
+type valueEncoder func(v reflect.Value, enc *Encoder) ([]byte, error)
 
 func newValueEncoder(t reflect.Type) valueEncoder {
 	if t == nil {
@@ -156,7 +189,7 @@ func newValueEncoder(t reflect.Type) valueEncoder {
 	return unknownTypeEncoder(t)
 }
 
-func structEncoder(v reflect.Value) ([]byte, error) {
+func structEncoder(v reflect.Value, enc *Encoder) ([]byte, error) {
 	ss := cachedStructSpec(v.Type())
 	dst := bytes.Repeat([]byte(" "), ss.ll)
 
@@ -165,46 +198,76 @@ func structEncoder(v reflect.Value) ([]byte, error) {
 			continue
 		}
 
-		val, err := spec.encoder(v.Field(i))
+		val, err := spec.encoder(v.Field(i), enc)
 		if err != nil {
 			return nil, err
 		}
-		copy(dst[spec.startPos-1:spec.endPos:spec.endPos], val)
+
+		var fieldLen = spec.endPos - spec.startPos + 1
+		if enc.errorOnOverflow && len(val) > fieldLen {
+			return nil, fmt.Errorf("Value '%v' of field %v is too long; %v length where field is only %v wide", string(val), spec.name, len(val), fieldLen)
+		}
+
+		// prefer the field's format if it has one, falling back to the encoder's format options, falling back to the default format
+		var format = spec.format
+		if format == nil && spec.isNumeric && enc.numericFormat != nil {
+			format = enc.numericFormat
+		}
+
+		if format == nil {
+			format = defaultFormat
+		}
+
+		var fillStart int
+
+		if format.rightAlign {
+			var startPos = spec.startPos + fieldLen - len(val) - 1
+			copy(dst[startPos:spec.endPos:spec.endPos], val)
+			fillStart = spec.startPos - 1
+		} else {
+			copy(dst[spec.startPos-1:spec.endPos:spec.endPos], val)
+			fillStart = spec.startPos + len(val) - 1
+		}
+
+		var fillLength = fieldLen - len(val)
+		for i := 0; i < fillLength; i++ {
+			dst[fillStart+i] = format.padChar
+		}
 	}
 	return dst, nil
 }
 
-func textMarshalerEncoder(v reflect.Value) ([]byte, error) {
+func textMarshalerEncoder(v reflect.Value, enc *Encoder) ([]byte, error) {
 	return v.Interface().(encoding.TextMarshaler).MarshalText()
 }
 
-func ptrInterfaceEncoder(v reflect.Value) ([]byte, error) {
+func ptrInterfaceEncoder(v reflect.Value, enc *Encoder) ([]byte, error) {
 	if v.IsNil() {
-		return nilEncoder(v)
+		return nilEncoder(v, enc)
 	}
-	return newValueEncoder(v.Elem().Type())(v.Elem())
+	return newValueEncoder(v.Elem().Type())(v.Elem(), enc)
 }
 
-func stringEncoder(v reflect.Value) ([]byte, error) {
+func stringEncoder(v reflect.Value, enc *Encoder) ([]byte, error) {
 	return []byte(v.String()), nil
 }
 
-func intEncoder(v reflect.Value) ([]byte, error) {
+func intEncoder(v reflect.Value, enc *Encoder) ([]byte, error) {
 	return []byte(strconv.Itoa(int(v.Int()))), nil
 }
 
 func floatEncoder(perc, bitSize int) valueEncoder {
-	return func(v reflect.Value) ([]byte, error) {
+	return func(v reflect.Value, enc *Encoder) ([]byte, error) {
 		return []byte(strconv.FormatFloat(v.Float(), 'f', perc, bitSize)), nil
 	}
 }
 
-func nilEncoder(v reflect.Value) ([]byte, error) {
+func nilEncoder(v reflect.Value, enc *Encoder) ([]byte, error) {
 	return nil, nil
 }
 
 func unknownTypeEncoder(t reflect.Type) valueEncoder {
-	return func(value reflect.Value) ([]byte, error) {
+	return func(value reflect.Value, enc *Encoder) ([]byte, error) {
 		return nil, &MarshalInvalidTypeError{typeName: t.Name()}
 	}
 }
