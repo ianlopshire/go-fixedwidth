@@ -152,6 +152,32 @@ func TestNewValueEncoder(t *testing.T) {
 	}
 }
 
+func TestEncoderWithOverflowErrors(t *testing.T) {
+	buff := new(bytes.Buffer)
+	enc := NewEncoder(buff, WithOverflowErrors())
+
+	type obj struct {
+		ID string `fixed:"1,5"`
+	}
+
+	err := enc.Encode(&obj{ID: "toolong"})
+	if err == nil {
+		t.Errorf("expected an overflow error")
+	} else {
+		const expected = "Value 'toolong' of field ID is too long; 7 length where field is only 5 wide"
+		if err.Error() != expected {
+			t.Errorf("expected err %v, got %v", expected, err.Error())
+		}
+	}
+
+	buff2 := new(bytes.Buffer)
+	enc2 := NewEncoder(buff2)
+	err2 := enc2.Encode(&obj{ID: "toolong"})
+	if err2 != nil {
+		t.Errorf("expected no overflow error since we didn't enable that option; got %v", err2)
+	}
+}
+
 func TestEncoder_SetLineTerminator(t *testing.T) {
 	buff := new(bytes.Buffer)
 	enc := NewEncoder(buff)
