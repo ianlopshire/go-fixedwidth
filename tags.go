@@ -42,7 +42,7 @@ type fieldSpec struct {
 	ok               bool
 }
 
-func buildStructSpec(t reflect.Type) structSpec {
+func buildStructSpec(t reflect.Type, trimSpace bool) structSpec {
 	ss := structSpec{
 		fieldSpecs: make([]fieldSpec, t.NumField()),
 	}
@@ -53,7 +53,7 @@ func buildStructSpec(t reflect.Type) structSpec {
 			ss.ll = ss.fieldSpecs[i].endPos
 		}
 		ss.fieldSpecs[i].encoder = newValueEncoder(f.Type)
-		ss.fieldSpecs[i].setter = newValueSetter(f.Type)
+		ss.fieldSpecs[i].setter = newValueSetter(f.Type, trimSpace)
 	}
 	return ss
 }
@@ -61,10 +61,10 @@ func buildStructSpec(t reflect.Type) structSpec {
 var fieldSpecCache sync.Map // map[reflect.Type]structSpec
 
 // cachedStructSpec is like buildStructSpec but cached to prevent duplicate work.
-func cachedStructSpec(t reflect.Type) structSpec {
+func cachedStructSpec(t reflect.Type, trimSpace bool) structSpec {
 	if f, ok := fieldSpecCache.Load(t); ok {
 		return f.(structSpec)
 	}
-	f, _ := fieldSpecCache.LoadOrStore(t, buildStructSpec(t))
+	f, _ := fieldSpecCache.LoadOrStore(t, buildStructSpec(t, trimSpace))
 	return f.(structSpec)
 }

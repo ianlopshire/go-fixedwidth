@@ -163,6 +163,24 @@ func TestUnmarshal(t *testing.T) {
 	})
 }
 
+func TestTrimSpace(t *testing.T) {
+	type sample struct {
+		ThingOne string `fixed:"1,5"`
+		ThingTwo string `fixed:"6,10"`
+	}
+	rawValue := []byte(" foo   bar")
+	target := &sample{}
+	expected := &sample{" foo ", "  bar"}
+	d := NewDecoder(bytes.NewReader(rawValue))
+	d.SetTrimSpace(false)
+	if err := d.Decode(target); err != nil {
+		t.Errorf("Decode(%v) = %v want <nil>", target, err)
+	}
+	if !reflect.DeepEqual(target, expected) {
+		t.Errorf("Unmarshal() want %+v, have %+v", expected, target)
+	}
+}
+
 func TestNewValueSetter(t *testing.T) {
 	for _, tt := range []struct {
 		name      string
@@ -211,7 +229,7 @@ func TestNewValueSetter(t *testing.T) {
 			// ensure we have an addressable target
 			var i = reflect.Indirect(reflect.New(reflect.TypeOf(tt.expected)))
 
-			err := newValueSetter(i.Type())(i, rawValue{data: string(tt.raw)})
+			err := newValueSetter(i.Type(), false)(i, rawValue{data: string(tt.raw)})
 			if tt.shouldErr != (err != nil) {
 				t.Errorf("newValueSetter(%s)() err want %v, have %v (%v)", reflect.TypeOf(tt.expected).Name(), tt.shouldErr, err != nil, err.Error())
 			}

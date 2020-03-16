@@ -157,7 +157,7 @@ func newValueEncoder(t reflect.Type) valueEncoder {
 }
 
 func structEncoder(v reflect.Value) ([]byte, error) {
-	ss := cachedStructSpec(v.Type())
+	ss := cachedStructSpec(v.Type(), true)
 	dst := bytes.Repeat([]byte(" "), ss.ll)
 
 	for i, spec := range ss.fieldSpecs {

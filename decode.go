@@ -25,6 +25,7 @@ type Decoder struct {
 	lineTerminator      []byte
 	done                bool
 	useCodepointIndices bool
+	trimSpace           bool
 
 	lastType       reflect.Type
 	lastValuSetter valueSetter
@@ -35,6 +36,7 @@ func NewDecoder(r io.Reader) *Decoder {
 	dec := &Decoder{
 		scanner:        bufio.NewScanner(r),
 		lineTerminator: []byte("\n"),
+		trimSpace:      true,
 	}
 	dec.scanner.Split(dec.scan)
 	return dec
@@ -85,6 +87,12 @@ func (e *UnmarshalTypeError) Error() string {
 // behavior) or in terms of UTF-8 decoded codepoints.
 func (d *Decoder) SetUseCodepointIndices(use bool) {
 	d.useCodepointIndices = use
+}
+
+// SetTrimSpace configures whether spaces are trimmed from decoded strings.
+// Strings are trimmed by default.
+func (d *Decoder) SetTrimSpace(trim bool) {
+	d.trimSpace = trim
 }
 
 // Decode reads from its input and stores the decoded data to the value
@@ -224,7 +232,7 @@ func (d *Decoder) readLine(v reflect.Value) (err error, ok bool) {
 	if t == d.lastType {
 		return d.lastValuSetter(v, rawValue), true
 	}
-	valueSetter := newValueSetter(t)
+	valueSetter := newValueSetter(t, d.trimSpace)
 	d.lastType = t
 	d.lastValuSetter = valueSetter
 	return valueSetter(v, rawValue), true
@@ -244,10 +252,11 @@ func rawValueFromLine(value rawValue, startPos, endPos int) rawValue {
 			relevantIndices = value.codepointIndices[startPos-1 : endPos]
 			lineData = value.data[relevantIndices[0]:value.codepointIndices[endPos]]
 		}
-		return rawValue{
-			data:             strings.TrimSpace(lineData),
+		val := rawValue{
+			data:             lineData,
 			codepointIndices: relevantIndices,
 		}
+		return val
 	} else {
 		if len(value.data) == 0 || startPos > len(value.data) {
 			return rawValue{data: ""}
@@ -255,9 +264,8 @@ func rawValueFromLine(value rawValue, startPos, endPos int) rawValue {
 		if endPos > len(value.data) {
 			endPos = len(value.data)
 		}
-		return rawValue{
-			data: strings.TrimSpace(value.data[startPos-1 : endPos]),
-		}
+		val := rawValue{data: value.data[startPos-1 : endPos]}
+		return val
 	}
 }
 
@@ -265,7 +273,7 @@ type valueSetter func(v reflect.Value, raw rawValue) error
 
 var textUnmarshalerType = reflect.TypeOf(new(encoding.TextUnmarshaler)).Elem()
 
-func newValueSetter(t reflect.Type) valueSetter {
+func newValueSetter(t reflect.Type, trimSpace bool) valueSetter {
 	if t.Implements(textUnmarshalerType) {
 		return textUnmarshalerSetter(t, false)
 	}
@@ -275,13 +283,13 @@ func newValueSetter(t reflect.Type) valueSetter {
 
 	switch t.Kind() {
 	case reflect.Ptr:
-		return ptrSetter(t)
+		return ptrSetter(t, trimSpace)
 	case reflect.Interface:
-		return interfaceSetter
+		return interfaceSetter(trimSpace)
 	case reflect.Struct:
-		return structSetter(t)
+		return structSetter(t, trimSpace)
 	case reflect.String:
-		return stringSetter
+		return stringSetter(trimSpace)
 	case reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8:
 		return intSetter
 	case reflect.Float32:
@@ -292,8 +300,8 @@ func newValueSetter(t reflect.Type) valueSetter {
 	return unknownSetter
 }
 
-func structSetter(t reflect.Type) valueSetter {
-	spec := cachedStructSpec(t)
+func structSetter(t reflect.Type, trimSpace bool) valueSetter {
+	spec := cachedStructSpec(t, trimSpace)
 	return func(v reflect.Value, raw rawValue) error {
 		for i, fieldSpec := range spec.fieldSpecs {
 			if !fieldSpec.ok {
@@ -332,12 +340,14 @@ func textUnmarshalerSetter(t reflect.Type, shouldAddr bool) valueSetter {
 	}
 }
 
-func interfaceSetter(v reflect.Value, raw rawValue) error {
-	return newValueSetter(v.Elem().Type())(v.Elem(), raw)
+func interfaceSetter(trimSpace bool) valueSetter {
+	return func(v reflect.Value, raw rawValue) error {
+		return newValueSetter(v.Elem().Type(), trimSpace)(v.Elem(), raw)
+	}
 }
 
-func ptrSetter(t reflect.Type) valueSetter {
-	innerSetter := newValueSetter(t.Elem())
+func ptrSetter(t reflect.Type, trimSpace bool) valueSetter {
+	innerSetter := newValueSetter(t.Elem(), trimSpace)
 	return func(v reflect.Value, raw rawValue) error {
 		if len(raw.data) <= 0 {
 			return nilSetter(v, raw)
@@ -349,16 +359,22 @@ func ptrSetter(t reflect.Type) valueSetter {
 	}
 }
 
-func stringSetter(v reflect.Value, raw rawValue) error {
-	v.SetString(raw.data)
-	return nil
+func stringSetter(trimSpace bool) valueSetter {
+	return func(v reflect.Value, raw rawValue) error {
+		toSet := raw.data
+		if trimSpace {
+			toSet = strings.TrimSpace(toSet)
+		}
+		v.SetString(toSet)
+		return nil
+	}
 }
 
 func intSetter(v reflect.Value, raw rawValue) error {
 	if len(raw.data) < 1 {
 		return nil
 	}
-	i, err := strconv.Atoi(raw.data)
+	i, err := strconv.Atoi(strings.TrimSpace(raw.data))
 	if err != nil {
 		return err
 	}
@@ -371,7 +387,7 @@ func floatSetter(bitSize int) valueSetter {
 		if len(raw.data) < 1 {
 			return nil
 		}
-		f, err := strconv.ParseFloat(raw.data, bitSize)
+		f, err := strconv.ParseFloat(strings.TrimSpace(raw.data), bitSize)
 		if err != nil {
 			return err
 		}
