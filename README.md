@@ -80,6 +80,15 @@ for {
 }
 ```
 
+By default, decoded strings will have leading and trailing whitespace trimmed
+before they are inserted on a struct. If you would like to turn off this
+behavior to preserve the strings as-is, you can set trimming to `false`.
+
+```go
+decoder := fixedwidth.NewDecoder(bytes.NewReader(data))
+decoder.SetTrimSpace(false)
+```
+
 If you have an input where the indices are expressed in unicode codepoints, and
 not raw bytes fixedwidth supports this. Your data must be UTF-8 encoded:
 
