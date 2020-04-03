@@ -7,26 +7,52 @@ import (
 	"sync"
 )
 
-// parseTag splits a struct fields fixed tag into its start and end positions.
+// parseTagWithFormat splits a struct fields fixed tag into its start position, end
+// position, format, and padding character.
+//
 // If the tag is not valid, ok will be false.
-func parseTag(tag string) (startPos, endPos int, ok bool) {
+func parseTag(tag string) (startPos, endPos int, format format, ok bool) {
 	parts := strings.Split(tag, ",")
-	if len(parts) != 2 {
-		return startPos, endPos, false
+	if len(parts) < 2 || len(parts) > 4 {
+		return 0, 0, defaultFormat, false
 	}
 
 	var err error
 	if startPos, err = strconv.Atoi(parts[0]); err != nil {
-		return startPos, endPos, false
+		return 0, 0, defaultFormat, false
+
 	}
 	if endPos, err = strconv.Atoi(parts[1]); err != nil {
-		return startPos, endPos, false
+		return 0, 0, defaultFormat, false
+
 	}
 	if startPos > endPos || (startPos == 0 && endPos == 0) {
-		return startPos, endPos, false
+		return 0, 0, defaultFormat, false
+
 	}
 
-	return startPos, endPos, true
+	format = defaultFormat
+
+	if len(parts) >= 3 {
+		alignment := alignment(parts[2])
+		if alignment.Valid() {
+			format.alignment = alignment
+		}
+	}
+
+	if len(parts) >= 4 {
+		v := parts[3]
+		switch {
+		case v == "_":
+			format.padChar = ' '
+		case parts[3] == "__":
+			format.padChar = '_'
+		case len(v) > 0:
+			format.padChar = v[0]
+		}
+	}
+
+	return startPos, endPos, format, true
 }
 
 type structSpec struct {
@@ -39,6 +65,7 @@ type fieldSpec struct {
 	startPos, endPos int
 	encoder          valueEncoder
 	setter           valueSetter
+	format           format
 	ok               bool
 }
 
@@ -48,10 +75,21 @@ func buildStructSpec(t reflect.Type) structSpec {
 	}
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
-		ss.fieldSpecs[i].startPos, ss.fieldSpecs[i].endPos, ss.fieldSpecs[i].ok = parseTag(f.Tag.Get("fixed"))
+
+		startPos, endPos, format, ok := parseTag(f.Tag.Get("fixed"))
+		if !ok {
+			continue
+		}
+
+		ss.fieldSpecs[i].startPos = startPos
+		ss.fieldSpecs[i].endPos = endPos
+		ss.fieldSpecs[i].format = format
+		ss.fieldSpecs[i].ok = ok
+
 		if ss.fieldSpecs[i].endPos > ss.ll {
 			ss.ll = ss.fieldSpecs[i].endPos
 		}
+
 		ss.fieldSpecs[i].encoder = newValueEncoder(f.Type)
 		ss.fieldSpecs[i].setter = newValueSetter(f.Type)
 	}
