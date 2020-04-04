@@ -230,7 +230,24 @@ func (d *Decoder) readLine(v reflect.Value) (err error, ok bool) {
 	return valueSetter(v, rawValue), true
 }
 
-func rawValueFromLine(value rawValue, startPos, endPos int) rawValue {
+func rawValueFromLine(value rawValue, startPos, endPos int, format format) rawValue {
+	var trimFunc func(string) string
+
+	switch format.alignment {
+	case left:
+		trimFunc = func(s string) string {
+			return strings.TrimRight(s, string(format.padChar))
+		}
+	case right:
+		trimFunc = func(s string) string {
+			return strings.TrimLeft(s, string(format.padChar))
+		}
+	default:
+		trimFunc = func(s string) string {
+			return strings.Trim(s, string(format.padChar))
+		}
+	}
+
 	if value.codepointIndices != nil {
 		if len(value.codepointIndices) == 0 || startPos > len(value.codepointIndices) {
 			return rawValue{data: ""}
@@ -245,7 +262,7 @@ func rawValueFromLine(value rawValue, startPos, endPos int) rawValue {
 			lineData = value.data[relevantIndices[0]:value.codepointIndices[endPos]]
 		}
 		return rawValue{
-			data:             strings.TrimSpace(lineData),
+			data:             trimFunc(lineData),
 			codepointIndices: relevantIndices,
 		}
 	} else {
@@ -256,7 +273,7 @@ func rawValueFromLine(value rawValue, startPos, endPos int) rawValue {
 			endPos = len(value.data)
 		}
 		return rawValue{
-			data: strings.TrimSpace(value.data[startPos-1 : endPos]),
+			data: trimFunc(value.data[startPos-1 : endPos]),
 		}
 	}
 }
@@ -299,7 +316,7 @@ func structSetter(t reflect.Type) valueSetter {
 			if !fieldSpec.ok {
 				continue
 			}
-			rawValue := rawValueFromLine(raw, fieldSpec.startPos, fieldSpec.endPos)
+			rawValue := rawValueFromLine(raw, fieldSpec.startPos, fieldSpec.endPos, fieldSpec.format)
 			err := fieldSpec.setter(v.Field(i), rawValue)
 			if err != nil {
 				sf := t.Field(i)
