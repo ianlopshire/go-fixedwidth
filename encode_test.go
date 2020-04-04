@@ -30,6 +30,26 @@ func ExampleMarshal() {
 	// 1    Ian       Lopshire  99.50
 }
 
+func ExampleMarshal_configurableFormatting() {
+	// define some data to encode
+	people := []struct {
+		ID        int     `fixed:"1,5,right,#"`
+		FirstName string  `fixed:"6,15,right,#"`
+		LastName  string  `fixed:"16,25,right,#"`
+		Grade     float64 `fixed:"26,30,right,#"`
+	}{
+		{1, "Ian", "Lopshire", 99.5},
+	}
+
+	data, err := Marshal(people)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("%s", data)
+	// Output:
+	// ####1#######Ian##Lopshire99.50
+}
+
 func TestMarshal(t *testing.T) {
 	type H struct {
 		F1 interface{} `fixed:"1,5"`
@@ -68,6 +88,80 @@ func TestMarshal(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMarshal_format(t *testing.T) {
+	type H struct {
+		F1 string `fixed:"1,5,left"`
+		F2 string `fixed:"6,10,left,#"`
+		F3 string `fixed:"11,15,right"`
+		F4 string `fixed:"16,20,right,#"`
+		F5 string `fixed:"21,25,default"`
+		F6 string `fixed:"26,30,default,#"`
+	}
+
+	for _, tt := range []struct {
+		name      string
+		v         interface{}
+		want      []byte
+		shouldErr bool
+	}{
+		{
+			name:      "base case",
+			v:         H{"foo", "bar", "biz", "baz", "bor", "box"},
+			want:      []byte(`foo  ` + `bar##` + `  biz` + `##baz` + `bor  ` + `box##`),
+			shouldErr: false,
+		},
+		{
+			name:      "empty",
+			v:         H{"", "", "", "", "", ""},
+			want:      []byte(`     ` + `#####` + `     ` + `#####` + `     ` + `#####`),
+			shouldErr: false,
+		},
+		{
+			name:      "overflow",
+			v:         H{"12345678", "12345678", "12345678", "12345678", "12345678", "12345678"},
+			want:      []byte(`12345` + `12345` + `12345` + `12345` + `12345` + `12345`),
+			shouldErr: false,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			have, err := Marshal(tt.v)
+			if tt.shouldErr != (err != nil) {
+				t.Errorf("Marshal() err want %v, have %v (%v)", tt.shouldErr, err != nil, err)
+			}
+			if !bytes.Equal(tt.want, have) {
+				t.Errorf("Marshal() want %q, have %q", string(tt.want), string(have))
+			}
+		})
+	}
+}
+
+func TestMarshal_backwardCompatibility(t *testing.T) {
+	// Overlapping intervals can, in effect, be used to coalesce a value. This tests
+	// ensures this special does not break.
+	t.Run("interval overlap coalesce", func(t *testing.T) {
+		type H struct {
+			F1 string `fixed:"1,5"`
+			F2 string `fixed:"1,5"`
+		}
+
+		have, err := Marshal(H{F1: "val"})
+		if err != nil {
+			t.Fatalf("Marshal() unexpected error: %v", err)
+		}
+		if want := []byte(`val  `); !bytes.Equal(have, want) {
+			t.Errorf("Marshal() want %q, have %q", string(want), string(have))
+		}
+
+		have, err = Marshal(H{F2: "val"})
+		if err != nil {
+			t.Fatalf("Marshal() unexpected error: %v", err)
+		}
+		if want := []byte(`val  `); !bytes.Equal(have, want) {
+			t.Errorf("Marshal() want %q, have %q", string(want), string(have))
+		}
+	})
 }
 
 func TestNewValueEncoder(t *testing.T) {
