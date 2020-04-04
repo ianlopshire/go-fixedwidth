@@ -7,9 +7,16 @@ Package fixedwidth provides encoding and decoding for fixed-width formatted Data
 ## Usage
 
 ### Struct Tags
-Position within a line is controlled via struct tags.
-The tags should be formatted as `fixed:"{startPos},{endPos}"` where `startPos` and `endPos` are both positive integers greater than 0.
-Positions start at 1. The interval is inclusive. Fields without tags are ignored.
+
+The struct tag schema schema used by fixedwidth is: `fixed:"{startPos},{endPos},[{alignment},[{padChar}]]"`<sup id="a1">[1](#f1)</sup>.
+
+The `startPos` and `endPos` arguments control the position within a line. `startPos` and `endPos` must both be positive integers greater than 0. Positions start at 1. The interval is inclusive. 
+
+The `alignment` argument controls the alignment of the value within it's interval. The valid options are `default`<sup id="a2">[2](#f2)</sup>, `right`, and `left`. The `alignment` is optional and can be omitted.
+
+The `padChar` argument controls the character that will be used to pad any empty characters in the interval after writing the value. The default padding character is a space. The `padChar` is optional and can be omitted.
+
+Fields without tags are ignored.
 
 ### Encode
 ```go
@@ -88,6 +95,18 @@ decoder := fixedwidth.NewDecoder(strings.NewReader(data))
 decoder.SetUseCodepointIndices(true)
 // Decode as usual now
 ```
+
+### Alignment Behavior
+
+| Alignment | Encoding | Decoding |
+| --------- | -------- | -------- |
+| `default` | Field is left aligned | The padding character is trimmed from both right and left of value |
+| `left` | Field is left aligned | The padding character is trimmed from right of value |
+| `right` | Field is right aligned | The padding character is trimmed from left of value |
+
+## Notes
+1. <span id="f1">`{}` indicates an argument. `[]` indicates and optional segment [^](#a1)</span>
+2. <span id="f2">The `default` alignment is similar to `left` but has slightly different behavior required to maintain backwards compatibility [^](#a2)</span> 
 
 ## Licence
 MIT
