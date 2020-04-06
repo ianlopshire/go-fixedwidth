@@ -163,6 +163,57 @@ func TestUnmarshal(t *testing.T) {
 	})
 }
 
+func TestUnmarshal_format(t *testing.T) {
+	type H struct {
+		F1 string `fixed:"1,5,left"`
+		F2 string `fixed:"6,10,left,#"`
+		F3 string `fixed:"11,15,right"`
+		F4 string `fixed:"16,20,right,#"`
+		F5 string `fixed:"21,25,default"`
+		F6 string `fixed:"26,30,default,#"`
+	}
+
+	for _, tt := range []struct {
+		name      string
+		rawValue  []byte
+		target    interface{}
+		expected  interface{}
+		shouldErr bool
+	}{
+		{
+			name:      "base case",
+			rawValue:  []byte(`foo  ` + `bar##` + `  baz` + `##biz` + ` bor ` + `#box#`),
+			target:    &[]H{},
+			expected:  &[]H{{"foo", "bar", "baz", "biz", "bor", "box"}},
+			shouldErr: false,
+		},
+		{
+			name:      "keep spaces",
+			rawValue:  []byte(`  foo` + `   ##` + `baz  ` + `##   ` + ` bor ` + `#####`),
+			target:    &[]H{},
+			expected:  &[]H{{"  foo", "   ", "baz  ", "   ", "bor", ""}},
+			shouldErr: false,
+		},
+		{
+			name:      "empty",
+			rawValue:  []byte(`     ` + `#####` + `     ` + `#####` + `     ` + `#####`),
+			target:    &[]H{},
+			expected:  &[]H{{"", "", "", "", "", ""}},
+			shouldErr: false,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			err := Unmarshal(tt.rawValue, tt.target)
+			if tt.shouldErr != (err != nil) {
+				t.Errorf("Unmarshal() err want %v, have %v (%v)", tt.shouldErr, err != nil, err)
+			}
+			if !tt.shouldErr && !reflect.DeepEqual(tt.target, tt.expected) {
+				t.Errorf("Unmarshal() want %+v, have %+v", tt.expected, tt.target)
+			}
+		})
+	}
+}
+
 func TestNewValueSetter(t *testing.T) {
 	for _, tt := range []struct {
 		name      string

@@ -156,6 +156,36 @@ func newValueEncoder(t reflect.Type) valueEncoder {
 	return unknownTypeEncoder(t)
 }
 
+func (ve valueEncoder) Write(v reflect.Value, dst []byte, format format) error {
+	value, err := ve(v)
+	if err != nil {
+		return err
+	}
+
+	if len(value) < len(dst) {
+		switch {
+		case format.alignment == right:
+			padding := bytes.Repeat([]byte{format.padChar}, len(dst)-len(value))
+			copy(dst, padding)
+			copy(dst[len(padding):], value)
+			return nil
+
+		// The second case in this block is a special case to maintain backward
+		// compatibility. In previous versions of the library, only len(value) bytes were
+		// written to dst. This means overlapping intervals can, in effect, be used to
+		// coalesce a value.
+		case format.alignment == left, format.alignment == defaultAlignment && format.padChar != ' ':
+			padding := bytes.Repeat([]byte{format.padChar}, len(dst)-len(value))
+			copy(dst, value)
+			copy(dst[len(value):], padding)
+			return nil
+		}
+	}
+
+	copy(dst, value)
+	return nil
+}
+
 func structEncoder(v reflect.Value) ([]byte, error) {
 	ss := cachedStructSpec(v.Type())
 	dst := bytes.Repeat([]byte(" "), ss.ll)
@@ -165,12 +195,12 @@ func structEncoder(v reflect.Value) ([]byte, error) {
 			continue
 		}
 
-		val, err := spec.encoder(v.Field(i))
+		err := spec.encoder.Write(v.Field(i), dst[spec.startPos-1:spec.endPos:spec.endPos], spec.format)
 		if err != nil {
 			return nil, err
 		}
-		copy(dst[spec.startPos-1:spec.endPos:spec.endPos], val)
 	}
+
 	return dst, nil
 }
 
