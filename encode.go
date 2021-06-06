@@ -152,6 +152,8 @@ func newValueEncoder(t reflect.Type) valueEncoder {
 		return floatEncoder(2, 64)
 	case reflect.Float32:
 		return floatEncoder(2, 32)
+	case reflect.Uint, reflect.Uint64, reflect.Uint32, reflect.Uint16, reflect.Uint8:
+		return uintEncoder
 	}
 	return unknownTypeEncoder(t)
 }
@@ -237,4 +239,8 @@ func unknownTypeEncoder(t reflect.Type) valueEncoder {
 	return func(value reflect.Value) ([]byte, error) {
 		return nil, &MarshalInvalidTypeError{typeName: t.Name()}
 	}
+}
+
+func uintEncoder(v reflect.Value) ([]byte, error) {
+	return []byte(strconv.FormatUint(v.Uint(), 10)), nil
 }
