@@ -19,9 +19,10 @@ import (
 // In order for a type to be encodable, it must implement
 // the encoding.TextMarshaler interface or be based on one
 // of the following builtin types: string, int, int64,
-// int32, int16, int8, float64, float32, or struct.
-// Pointers to encodable types and interfaces containing
-// encodable types are also encodable.
+// int32, int16, int8, uint, uint64, uint32, uint16,
+// uint8, float64, float32, or struct. Pointers to
+// encodable types and interfaces containing encodable
+// types are also encodable.
 //
 // nil pointers and interfaces will be omitted. zero vales
 // will be encoded normally.
