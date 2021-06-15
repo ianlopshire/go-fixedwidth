@@ -152,6 +152,8 @@ func newValueEncoder(t reflect.Type) valueEncoder {
 		return floatEncoder(2, 64)
 	case reflect.Float32:
 		return floatEncoder(2, 32)
+	case reflect.Bool:
+		return boolEncoder
 	}
 	return unknownTypeEncoder(t)
 }
@@ -227,6 +229,10 @@ func floatEncoder(perc, bitSize int) valueEncoder {
 	return func(v reflect.Value) ([]byte, error) {
 		return []byte(strconv.FormatFloat(v.Float(), 'f', perc, bitSize)), nil
 	}
+}
+
+func boolEncoder(v reflect.Value) ([]byte, error) {
+	return []byte(strconv.FormatBool(v.Bool())), nil
 }
 
 func nilEncoder(v reflect.Value) ([]byte, error) {

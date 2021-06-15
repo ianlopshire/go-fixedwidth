@@ -305,6 +305,8 @@ func newValueSetter(t reflect.Type) valueSetter {
 		return floatSetter(32)
 	case reflect.Float64:
 		return floatSetter(64)
+	case reflect.Bool:
+		return boolSetter
 	}
 	return unknownSetter
 }
@@ -395,4 +397,19 @@ func floatSetter(bitSize int) valueSetter {
 		v.SetFloat(f)
 		return nil
 	}
+}
+
+func boolSetter(v reflect.Value, raw rawValue) error {
+	if len(raw.data) == 0 {
+		return nil
+	}
+
+	trimmedBool := strings.TrimSpace(raw.data)
+	val, err := strconv.ParseBool(trimmedBool)
+	if err != nil {
+		return err
+	}
+
+	v.SetBool(val)
+	return nil
 }
