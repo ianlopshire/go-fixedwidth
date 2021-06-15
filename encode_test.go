@@ -17,8 +17,9 @@ func ExampleMarshal() {
 		FirstName string  `fixed:"6,15"`
 		LastName  string  `fixed:"16,25"`
 		Grade     float64 `fixed:"26,30"`
+		Alive     bool    `fixed:"32,36"`
 	}{
-		{1, "Ian", "Lopshire", 99.5},
+		{1, "Ian", "Lopshire", 99.5, true},
 	}
 
 	data, err := Marshal(people)
@@ -27,7 +28,7 @@ func ExampleMarshal() {
 	}
 	fmt.Printf("%s", data)
 	// Output:
-	// 1    Ian       Lopshire  99.50
+	// 1    Ian       Lopshire  99.50 true
 }
 
 func ExampleMarshal_configurableFormatting() {
@@ -37,8 +38,9 @@ func ExampleMarshal_configurableFormatting() {
 		FirstName string  `fixed:"6,15,right,#"`
 		LastName  string  `fixed:"16,25,right,#"`
 		Grade     float64 `fixed:"26,30,right,#"`
+		Alive     bool    `fixed:"31,36,right,#"`
 	}{
-		{1, "Ian", "Lopshire", 99.5},
+		{1, "Ian", "Lopshire", 99.5, true},
 	}
 
 	data, err := Marshal(people)
@@ -47,7 +49,7 @@ func ExampleMarshal_configurableFormatting() {
 	}
 	fmt.Printf("%s", data)
 	// Output:
-	// ####1#######Ian##Lopshire99.50
+	// ####1#######Ian##Lopshire99.50##true
 }
 
 func TestMarshal(t *testing.T) {
