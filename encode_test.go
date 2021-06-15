@@ -178,7 +178,6 @@ func TestNewValueEncoder(t *testing.T) {
 
 		{"[]string (invalid)", []string{"a", "b"}, []byte(""), true},
 		{"[]string interface (invalid)", interface{}([]string{"a", "b"}), []byte(""), true},
-		{"bool (invalid)", true, []byte(""), true},
 
 		{"string", "foo", []byte("foo"), false},
 		{"string interface", interface{}("foo"), []byte("foo"), false},
@@ -207,6 +206,11 @@ func TestNewValueEncoder(t *testing.T) {
 		{"*int", intp(123), []byte("123"), false},
 		{"*int zero", intp(0), []byte("0"), false},
 		{"*int nil", nilInt, []byte(""), false},
+
+		{"bool positive", bool(true), []byte("true"), false},
+		{"bool interface positive", interface{}(bool(true)), []byte("true"), false},
+		{"*bool positive", boolp(true), []byte("true"), false},
+		{"*bool negative", boolp(false), []byte("false"), false},
 
 		{"TextUnmarshaler", EncodableString{"foo", nil}, []byte("foo"), false},
 		{"TextUnmarshaler interface", interface{}(EncodableString{"foo", nil}), []byte("foo"), false},
