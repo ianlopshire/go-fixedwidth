@@ -15,6 +15,7 @@ func int32p(v int32) *int32       { return &v }
 func int16p(v int16) *int16       { return &v }
 func int8p(v int8) *int8          { return &v }
 func stringp(v string) *string    { return &v }
+func boolp(v bool) *bool          { return &v }
 
 // EncodableString is a string that implements the encoding TextUnmarshaler and TextMarshaler interface.
 // This is useful for testing.

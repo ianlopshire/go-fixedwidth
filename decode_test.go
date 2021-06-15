@@ -259,6 +259,14 @@ func TestNewValueSetter(t *testing.T) {
 		{"int16", []byte("1"), int16(1), false},
 		{"int32", []byte("1"), int32(1), false},
 		{"int64", []byte("1"), int64(1), false},
+
+		{"bool positive", []byte("false"), bool(false), false},
+		{"bool negative", []byte("true"), bool(true), false},
+		{"bool empty", []byte(""), bool(false), false},
+		{"*bool positive", []byte("true"), boolp(true), false},
+		{"*bool negative", []byte("0"), boolp(false), false},
+		{"*bool empty", []byte(""), (*bool)(nil), false},
+		{"bool Invalid", []byte("foo"), bool(true), true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			// ensure we have an addressable target
