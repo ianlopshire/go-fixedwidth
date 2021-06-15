@@ -19,9 +19,10 @@ import (
 // In order for a type to be encodable, it must implement
 // the encoding.TextMarshaler interface or be based on one
 // of the following builtin types: string, int, int64,
-// int32, int16, int8, float64, float32, or struct.
-// Pointers to encodable types and interfaces containing
-// encodable types are also encodable.
+// int32, int16, int8, uint, uint64, uint32, uint16,
+// uint8, float64, float32, or struct. Pointers to
+// encodable types and interfaces containing encodable
+// types are also encodable.
 //
 // nil pointers and interfaces will be omitted. zero vales
 // will be encoded normally.
@@ -152,6 +153,8 @@ func newValueEncoder(t reflect.Type) valueEncoder {
 		return floatEncoder(2, 64)
 	case reflect.Float32:
 		return floatEncoder(2, 32)
+	case reflect.Uint, reflect.Uint64, reflect.Uint32, reflect.Uint16, reflect.Uint8:
+		return uintEncoder
 	}
 	return unknownTypeEncoder(t)
 }
@@ -237,4 +240,8 @@ func unknownTypeEncoder(t reflect.Type) valueEncoder {
 	return func(value reflect.Value) ([]byte, error) {
 		return nil, &MarshalInvalidTypeError{typeName: t.Name()}
 	}
+}
+
+func uintEncoder(v reflect.Value) ([]byte, error) {
+	return []byte(strconv.FormatUint(v.Uint(), 10)), nil
 }

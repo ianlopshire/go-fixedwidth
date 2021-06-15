@@ -17,8 +17,9 @@ func ExampleMarshal() {
 		FirstName string  `fixed:"6,15"`
 		LastName  string  `fixed:"16,25"`
 		Grade     float64 `fixed:"26,30"`
+		Age       uint    `fixed:"31,33"`
 	}{
-		{1, "Ian", "Lopshire", 99.5},
+		{1, "Ian", "Lopshire", 99.5, 20},
 	}
 
 	data, err := Marshal(people)
@@ -27,7 +28,7 @@ func ExampleMarshal() {
 	}
 	fmt.Printf("%s", data)
 	// Output:
-	// 1    Ian       Lopshire  99.50
+	// 1    Ian       Lopshire  99.5020
 }
 
 func ExampleMarshal_configurableFormatting() {
@@ -37,8 +38,9 @@ func ExampleMarshal_configurableFormatting() {
 		FirstName string  `fixed:"6,15,right,#"`
 		LastName  string  `fixed:"16,25,right,#"`
 		Grade     float64 `fixed:"26,30,right,#"`
+		Age       uint    `fixed:"31,33,right,#"`
 	}{
-		{1, "Ian", "Lopshire", 99.5},
+		{1, "Ian", "Lopshire", 99.5, 20},
 	}
 
 	data, err := Marshal(people)
@@ -47,7 +49,7 @@ func ExampleMarshal_configurableFormatting() {
 	}
 	fmt.Printf("%s", data)
 	// Output:
-	// ####1#######Ian##Lopshire99.50
+	// ####1#######Ian##Lopshire99.50#20
 }
 
 func TestMarshal(t *testing.T) {
@@ -209,6 +211,13 @@ func TestNewValueEncoder(t *testing.T) {
 		{"TextUnmarshaler", EncodableString{"foo", nil}, []byte("foo"), false},
 		{"TextUnmarshaler interface", interface{}(EncodableString{"foo", nil}), []byte("foo"), false},
 		{"TextUnmarshaler error", EncodableString{"foo", errors.New("TextUnmarshaler error")}, []byte("foo"), true},
+
+		{"uint", uint(123), []byte("123"), false},
+		{"uint interface", interface{}(uint(123)), []byte("123"), false},
+		{"uint zero", uint(0), []byte("0"), false},
+		{"*uint", uintp(123), []byte("123"), false},
+		{"*uint zero", uintp(0), []byte("0"), false},
+		{"*uint nil", nilUint, []byte(""), false},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			o, err := newValueEncoder(reflect.TypeOf(tt.i))(reflect.ValueOf(tt.i))

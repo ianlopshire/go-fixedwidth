@@ -17,13 +17,14 @@ func ExampleUnmarshal() {
 		FirstName string  `fixed:"6,15"`
 		LastName  string  `fixed:"16,25"`
 		Grade     float64 `fixed:"26,30"`
+		Age       uint    `fixed:"31,33"`
 	}
 
 	// define some fixed-with data to parse
 	data := []byte("" +
-		"1    Ian       Lopshire  99.50" + "\n" +
-		"2    John      Doe       89.50" + "\n" +
-		"3    Jane      Doe       79.50" + "\n")
+		"1    Ian       Lopshire  99.50 20" + "\n" +
+		"2    John      Doe       89.50 21" + "\n" +
+		"3    Jane      Doe       79.50 22" + "\n")
 
 	err := Unmarshal(data, &people)
 	if err != nil {
@@ -34,9 +35,9 @@ func ExampleUnmarshal() {
 	fmt.Printf("%+v\n", people[1])
 	fmt.Printf("%+v\n", people[2])
 	// Output:
-	//{ID:1 FirstName:Ian LastName:Lopshire Grade:99.5}
-	//{ID:2 FirstName:John LastName:Doe Grade:89.5}
-	//{ID:3 FirstName:Jane LastName:Doe Grade:79.5}
+	//{ID:1 FirstName:Ian LastName:Lopshire Grade:99.5 Age:20}
+	//{ID:2 FirstName:John LastName:Doe Grade:89.5 Age:21}
+	//{ID:3 FirstName:Jane LastName:Doe Grade:79.5 Age:22}
 }
 
 func TestUnmarshal(t *testing.T) {
@@ -46,6 +47,7 @@ func TestUnmarshal(t *testing.T) {
 		Int             int             `fixed:"6,10"`
 		Float           float64         `fixed:"11,15"`
 		TextUnmarshaler EncodableString `fixed:"16,20"`
+		Uint            uint            `fixed:"21,25"`
 	}
 	for _, tt := range []struct {
 		name      string
@@ -56,45 +58,45 @@ func TestUnmarshal(t *testing.T) {
 	}{
 		{
 			name:     "Slice Case (no trailing new line)",
-			rawValue: []byte("foo  123  1.2  bar" + "\n" + "bar  321  2.1  foo"),
+			rawValue: []byte("foo  123  1.2  bar  12345" + "\n" + "bar  321  2.1  foo  54321"),
 			target:   &[]allTypes{},
 			expected: &[]allTypes{
-				{"foo", 123, 1.2, EncodableString{"bar", nil}},
-				{"bar", 321, 2.1, EncodableString{"foo", nil}},
+				{"foo", 123, 1.2, EncodableString{"bar", nil}, uint(12345)},
+				{"bar", 321, 2.1, EncodableString{"foo", nil}, uint(54321)},
 			},
 			shouldErr: false,
 		},
 		{
 			name:     "Slice Case (trailing new line)",
-			rawValue: []byte("foo  123  1.2  bar" + "\n" + "bar  321  2.1  foo" + "\n"),
+			rawValue: []byte("foo  123  1.2  bar  12345" + "\n" + "bar  321  2.1  foo  54321" + "\n"),
 			target:   &[]allTypes{},
 			expected: &[]allTypes{
-				{"foo", 123, 1.2, EncodableString{"bar", nil}},
-				{"bar", 321, 2.1, EncodableString{"foo", nil}},
+				{"foo", 123, 1.2, EncodableString{"bar", nil}, uint(12345)},
+				{"bar", 321, 2.1, EncodableString{"foo", nil}, uint(54321)},
 			},
 			shouldErr: false,
 		},
 		{
 			name:     "Slice Case (blank line mid file)",
-			rawValue: []byte("foo  123  1.2  bar" + "\n" + "\n" + "bar  321  2.1  foo" + "\n"),
+			rawValue: []byte("foo  123  1.2  bar  12345" + "\n" + "\n" + "bar  321  2.1  foo  54321" + "\n"),
 			target:   &[]allTypes{},
 			expected: &[]allTypes{
-				{"foo", 123, 1.2, EncodableString{"bar", nil}},
-				{"", 0, 0, EncodableString{"", nil}},
-				{"bar", 321, 2.1, EncodableString{"foo", nil}},
+				{"foo", 123, 1.2, EncodableString{"bar", nil}, uint(12345)},
+				{"", 0, 0, EncodableString{"", nil}, uint(0)},
+				{"bar", 321, 2.1, EncodableString{"foo", nil}, uint(54321)},
 			},
 			shouldErr: false,
 		},
 		{
 			name:      "Basic Struct Case",
-			rawValue:  []byte("foo  123  1.2  bar"),
+			rawValue:  []byte("foo  123  1.2  bar  12345"),
 			target:    &allTypes{},
-			expected:  &allTypes{"foo", 123, 1.2, EncodableString{"bar", nil}},
+			expected:  &allTypes{"foo", 123, 1.2, EncodableString{"bar", nil}, uint(12345)},
 			shouldErr: false,
 		},
 		{
 			name:      "Unmarshal Error",
-			rawValue:  []byte("foo  nan  ddd  bar"),
+			rawValue:  []byte("foo  nan  ddd  bar  baz"),
 			target:    &allTypes{},
 			expected:  &allTypes{},
 			shouldErr: true,
@@ -108,7 +110,7 @@ func TestUnmarshal(t *testing.T) {
 		},
 		{
 			name:      "Invalid Target",
-			rawValue:  []byte("foo  123  1.2  bar"),
+			rawValue:  []byte("foo  123  1.2  bar  baz"),
 			target:    allTypes{},
 			expected:  allTypes{},
 			shouldErr: true,
@@ -257,6 +259,20 @@ func TestNewValueSetter(t *testing.T) {
 		{"int16", []byte("1"), int16(1), false},
 		{"int32", []byte("1"), int32(1), false},
 		{"int64", []byte("1"), int64(1), false},
+
+		{"uint", []byte("1"), uint(1), false},
+		{"uint zero", []byte("0"), uint(0), false},
+		{"uint empty", []byte(""), uint(0), false},
+		{"*uint", []byte("1"), uintp(1), false},
+		{"*uint zero", []byte("0"), uintp(0), false},
+		{"*uint empty", []byte(""), (*uint)(nil), false},
+		{"uint Invalid", []byte("foo"), uint(0), true},
+		{"uint Negative", []byte("-1"), uint(0), true},
+
+		{"uint8", []byte("1"), uint8(1), false},
+		{"uint16", []byte("1"), uint16(1), false},
+		{"uint32", []byte("1"), uint32(1), false},
+		{"uint64", []byte("1"), uint64(1), false},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			// ensure we have an addressable target
