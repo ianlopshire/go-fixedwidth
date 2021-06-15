@@ -18,13 +18,14 @@ func ExampleUnmarshal() {
 		LastName  string  `fixed:"16,25"`
 		Grade     float64 `fixed:"26,30"`
 		Age       uint    `fixed:"31,33"`
+		Alive     bool    `fixed:"34,39"`
 	}
 
 	// define some fixed-with data to parse
 	data := []byte("" +
-		"1    Ian       Lopshire  99.50 20" + "\n" +
-		"2    John      Doe       89.50 21" + "\n" +
-		"3    Jane      Doe       79.50 22" + "\n")
+		"1    Ian       Lopshire  99.50 20 false" + "\n" +
+		"2    John      Doe       89.50 21 true" + "\n" +
+		"3    Jane      Doe       79.50 22 false" + "\n")
 
 	err := Unmarshal(data, &people)
 	if err != nil {
@@ -35,9 +36,9 @@ func ExampleUnmarshal() {
 	fmt.Printf("%+v\n", people[1])
 	fmt.Printf("%+v\n", people[2])
 	// Output:
-	//{ID:1 FirstName:Ian LastName:Lopshire Grade:99.5 Age:20}
-	//{ID:2 FirstName:John LastName:Doe Grade:89.5 Age:21}
-	//{ID:3 FirstName:Jane LastName:Doe Grade:79.5 Age:22}
+	//{ID:1 FirstName:Ian LastName:Lopshire Grade:99.5 Age:20 Alive:false}
+	//{ID:2 FirstName:John LastName:Doe Grade:89.5 Age:21 Alive:true}
+	//{ID:3 FirstName:Jane LastName:Doe Grade:79.5 Age:22 Alive:false}
 }
 
 func TestUnmarshal(t *testing.T) {
@@ -48,6 +49,7 @@ func TestUnmarshal(t *testing.T) {
 		Float           float64         `fixed:"11,15"`
 		TextUnmarshaler EncodableString `fixed:"16,20"`
 		Uint            uint            `fixed:"21,25"`
+		Bool            bool            `fixed:"26,31"`
 	}
 	for _, tt := range []struct {
 		name      string
@@ -58,40 +60,40 @@ func TestUnmarshal(t *testing.T) {
 	}{
 		{
 			name:     "Slice Case (no trailing new line)",
-			rawValue: []byte("foo  123  1.2  bar  12345" + "\n" + "bar  321  2.1  foo  54321"),
+			rawValue: []byte("foo  123  1.2  bar  12345 false" + "\n" + "bar  321  2.1  foo  54321 true"),
 			target:   &[]allTypes{},
 			expected: &[]allTypes{
-				{"foo", 123, 1.2, EncodableString{"bar", nil}, uint(12345)},
-				{"bar", 321, 2.1, EncodableString{"foo", nil}, uint(54321)},
+				{"foo", 123, 1.2, EncodableString{"bar", nil}, uint(12345), false},
+				{"bar", 321, 2.1, EncodableString{"foo", nil}, uint(54321), true},
 			},
 			shouldErr: false,
 		},
 		{
 			name:     "Slice Case (trailing new line)",
-			rawValue: []byte("foo  123  1.2  bar  12345" + "\n" + "bar  321  2.1  foo  54321" + "\n"),
+			rawValue: []byte("foo  123  1.2  bar  12345 false" + "\n" + "bar  321  2.1  foo  54321 true" + "\n"),
 			target:   &[]allTypes{},
 			expected: &[]allTypes{
-				{"foo", 123, 1.2, EncodableString{"bar", nil}, uint(12345)},
-				{"bar", 321, 2.1, EncodableString{"foo", nil}, uint(54321)},
+				{"foo", 123, 1.2, EncodableString{"bar", nil}, uint(12345), false},
+				{"bar", 321, 2.1, EncodableString{"foo", nil}, uint(54321), true},
 			},
 			shouldErr: false,
 		},
 		{
 			name:     "Slice Case (blank line mid file)",
-			rawValue: []byte("foo  123  1.2  bar  12345" + "\n" + "\n" + "bar  321  2.1  foo  54321" + "\n"),
+			rawValue: []byte("foo  123  1.2  bar  12345 false" + "\n" + "\n" + "bar  321  2.1  foo  54321 true" + "\n"),
 			target:   &[]allTypes{},
 			expected: &[]allTypes{
-				{"foo", 123, 1.2, EncodableString{"bar", nil}, uint(12345)},
-				{"", 0, 0, EncodableString{"", nil}, uint(0)},
-				{"bar", 321, 2.1, EncodableString{"foo", nil}, uint(54321)},
+				{"foo", 123, 1.2, EncodableString{"bar", nil}, uint(12345), false},
+				{"", 0, 0, EncodableString{"", nil}, uint(0), false},
+				{"bar", 321, 2.1, EncodableString{"foo", nil}, uint(54321), true},
 			},
 			shouldErr: false,
 		},
 		{
 			name:      "Basic Struct Case",
-			rawValue:  []byte("foo  123  1.2  bar  12345"),
+			rawValue:  []byte("foo  123  1.2  bar  12345 false"),
 			target:    &allTypes{},
-			expected:  &allTypes{"foo", 123, 1.2, EncodableString{"bar", nil}, uint(12345)},
+			expected:  &allTypes{"foo", 123, 1.2, EncodableString{"bar", nil}, uint(12345), false},
 			shouldErr: false,
 		},
 		{
@@ -110,7 +112,7 @@ func TestUnmarshal(t *testing.T) {
 		},
 		{
 			name:      "Invalid Target",
-			rawValue:  []byte("foo  123  1.2  bar  baz"),
+			rawValue:  []byte("foo  123  1.2  bar  baz false"),
 			target:    allTypes{},
 			expected:  allTypes{},
 			shouldErr: true,
