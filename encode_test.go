@@ -66,6 +66,8 @@ func TestMarshal(t *testing.T) {
 	}{"foo", "foo", "foo"}
 	marshalError := errors.New("marshal error")
 
+	var invtype func()
+
 	for _, tt := range []struct {
 		name      string
 		i         interface{}
@@ -77,8 +79,8 @@ func TestMarshal(t *testing.T) {
 		{"empty slice", []H{}, nil, false},
 		{"pointer", &H{"foo", 1}, []byte("foo  1    "), false},
 		{"nil", nil, nil, false},
-		{"invalid type", true, nil, true},
-		{"invalid type in struct", H{"foo", true}, nil, true},
+		{"invalid type", invtype, nil, true},
+		{"invalid type in struct", H{"foo", invtype}, nil, true},
 		{"marshal error", EncodableString{"", marshalError}, nil, true},
 		{"invalid tags", tagHelper, []byte("foo  "), false},
 	} {
