@@ -26,8 +26,9 @@ people := []struct {
     FirstName string  `fixed:"6,15"`
     LastName  string  `fixed:"16,25"`
     Grade     float64 `fixed:"26,30"`
+    Alive     bool    `fixed:"32,36"`
 }{
-    {1, "Ian", "Lopshire", 99.5},
+    {1, "Ian", "Lopshire", 99.5, true},
 }
 
 data, err := fixedwidth.Marshal(people)
@@ -36,7 +37,7 @@ if err != nil {
 }
 fmt.Printf("%s", data)
 // Output:
-// 1    Ian       Lopshire  99.50
+// 1    Ian       Lopshire  99.50 true
 ```
 
 ### Decode
@@ -47,14 +48,14 @@ var people []struct {
     FirstName string  `fixed:"6,15"`
     LastName  string  `fixed:"16,25"`
     Grade     float64 `fixed:"26,30"`
+    Alive     bool    `fixed:"31,36"`
 }
 
 // define some fixed-with data to parse
 data := []byte("" +
-    "1    Ian       Lopshire  99.50" + "\n" +
-    "2    John      Doe       89.50" + "\n" +
-    "3    Jane      Doe       79.50" + "\n")
-
+    "1    Ian       Lopshire  99.50 false" + "\n" +
+    "2    John      Doe       89.50 true" + "\n" +
+    "3    Jane      Doe       79.50 false" + "\n")
 
 err := fixedwidth.Unmarshal(data, &people)
 if err != nil {
@@ -65,9 +66,9 @@ fmt.Printf("%+v\n", people[0])
 fmt.Printf("%+v\n", people[1])
 fmt.Printf("%+v\n", people[2])
 // Output:
-//{ID:1 FirstName:Ian LastName:Lopshire Grade:99.5}
-//{ID:2 FirstName:John LastName:Doe Grade:89.5}
-//{ID:3 FirstName:Jane LastName:Doe Grade:79.5}
+//{ID:1 FirstName:Ian LastName:Lopshire Grade:99.5 Alive:false}
+//{ID:2 FirstName:John LastName:Doe Grade:89.5 Alive:true}
+//{ID:3 FirstName:Jane LastName:Doe Grade:79.5 Alive:false}
 ```
 
 It is also possible to read data incrementally
