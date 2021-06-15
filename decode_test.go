@@ -17,7 +17,7 @@ func ExampleUnmarshal() {
 		FirstName string  `fixed:"6,15"`
 		LastName  string  `fixed:"16,25"`
 		Grade     float64 `fixed:"26,30"`
-		Alive     bool    `fixed:"32,36"`
+		Alive     bool    `fixed:"31,36"`
 	}
 
 	// define some fixed-with data to parse
