@@ -49,15 +49,17 @@ var people []struct {
     LastName  string  `fixed:"16,25"`
     Grade     float64 `fixed:"26,30"`
     Alive     bool    `fixed:"31,36"`
+    Github    bool    `fixed:"37,38"`
 }
 
 // define some fixed-with data to parse
 data := []byte("" +
-    "1    Ian       Lopshire  99.50 false" + "\n" +
-    "2    John      Doe       89.50 true" + "\n" +
-    "3    Jane      Doe       79.50 false" + "\n")
+    "1    Ian       Lopshire  99.50 false f" + "\n" +
+    "2    John      Doe       89.50 true  t" + "\n" +
+    "3    Jane      Doe       79.50 false F" + "\n" +
+    "4    Ann       Carraway  79.59 false T" + "\n")
 
-err := fixedwidth.Unmarshal(data, &people)
+err := Unmarshal(data, &people)
 if err != nil {
     log.Fatal(err)
 }
@@ -65,10 +67,12 @@ if err != nil {
 fmt.Printf("%+v\n", people[0])
 fmt.Printf("%+v\n", people[1])
 fmt.Printf("%+v\n", people[2])
+fmt.Printf("%+v\n", people[3])
 // Output:
-//{ID:1 FirstName:Ian LastName:Lopshire Grade:99.5 Alive:false}
-//{ID:2 FirstName:John LastName:Doe Grade:89.5 Alive:true}
-//{ID:3 FirstName:Jane LastName:Doe Grade:79.5 Alive:false}
+//{ID:1 FirstName:Ian LastName:Lopshire Grade:99.5 Alive:false Github:false}
+//{ID:2 FirstName:John LastName:Doe Grade:89.5 Alive:true Github:true}
+//{ID:3 FirstName:Jane LastName:Doe Grade:79.5 Alive:false Github:false}
+//{ID:4 FirstName:Ann LastName:Carraway Grade:79.59 Alive:false Github:true}
 ```
 
 It is also possible to read data incrementally
