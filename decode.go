@@ -418,8 +418,7 @@ func boolSetter(v reflect.Value, raw rawValue) error {
 		return nil
 	}
 
-	trimmedBool := strings.TrimSpace(raw.data)
-	val, err := strconv.ParseBool(trimmedBool)
+	val, err := strconv.ParseBool(raw.data)
 	if err != nil {
 		return err
 	}
