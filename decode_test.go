@@ -284,7 +284,7 @@ func TestNewValueSetter(t *testing.T) {
 		{"bool Invalid", []byte("foo"), bool(true), true},
 		{"short bool negative (lowercase)", []byte("f"), bool(false), false},
 		{"short bool positive (lowercase)", []byte("t"), bool(true), false},
-		{"short bool negative (uppercase)", []byte("f"), bool(false), false},
+		{"short bool negative (uppercase)", []byte("F"), bool(false), false},
 		{"short bool positive (uppercase)", []byte("T"), bool(true), false},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
