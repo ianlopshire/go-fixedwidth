@@ -307,6 +307,8 @@ func newValueSetter(t reflect.Type) valueSetter {
 		return floatSetter(64)
 	case reflect.Uint, reflect.Uint64, reflect.Uint32, reflect.Uint16, reflect.Uint8:
 		return uintSetter
+	case reflect.Bool:
+		return boolSetter
 	}
 	return unknownSetter
 }
@@ -408,5 +410,19 @@ func uintSetter(v reflect.Value, raw rawValue) error {
 		return err
 	}
 	v.SetUint(uint64(i))
+	return nil
+}
+
+func boolSetter(v reflect.Value, raw rawValue) error {
+	if len(raw.data) == 0 {
+		return nil
+	}
+
+	val, err := strconv.ParseBool(raw.data)
+	if err != nil {
+		return err
+	}
+
+	v.SetBool(val)
 	return nil
 }

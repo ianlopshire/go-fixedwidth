@@ -20,7 +20,7 @@ import (
 // the encoding.TextMarshaler interface or be based on one
 // of the following builtin types: string, int, int64,
 // int32, int16, int8, uint, uint64, uint32, uint16,
-// uint8, float64, float32, or struct. Pointers to
+// uint8, float64, float32, bool, or struct. Pointers to
 // encodable types and interfaces containing encodable
 // types are also encodable.
 //
@@ -155,6 +155,8 @@ func newValueEncoder(t reflect.Type) valueEncoder {
 		return floatEncoder(2, 32)
 	case reflect.Uint, reflect.Uint64, reflect.Uint32, reflect.Uint16, reflect.Uint8:
 		return uintEncoder
+	case reflect.Bool:
+		return boolEncoder
 	}
 	return unknownTypeEncoder(t)
 }
@@ -230,6 +232,10 @@ func floatEncoder(perc, bitSize int) valueEncoder {
 	return func(v reflect.Value) ([]byte, error) {
 		return []byte(strconv.FormatFloat(v.Float(), 'f', perc, bitSize)), nil
 	}
+}
+
+func boolEncoder(v reflect.Value) ([]byte, error) {
+	return []byte(strconv.FormatBool(v.Bool())), nil
 }
 
 func nilEncoder(v reflect.Value) ([]byte, error) {

@@ -18,8 +18,9 @@ func ExampleMarshal() {
 		LastName  string  `fixed:"16,25"`
 		Grade     float64 `fixed:"26,30"`
 		Age       uint    `fixed:"31,33"`
+		Alive     bool    `fixed:"34,39"`
 	}{
-		{1, "Ian", "Lopshire", 99.5, 20},
+		{1, "Ian", "Lopshire", 99.5, 20, true},
 	}
 
 	data, err := Marshal(people)
@@ -28,7 +29,7 @@ func ExampleMarshal() {
 	}
 	fmt.Printf("%s", data)
 	// Output:
-	// 1    Ian       Lopshire  99.5020
+	// 1    Ian       Lopshire  99.5020 true
 }
 
 func ExampleMarshal_configurableFormatting() {
@@ -39,8 +40,9 @@ func ExampleMarshal_configurableFormatting() {
 		LastName  string  `fixed:"16,25,right,#"`
 		Grade     float64 `fixed:"26,30,right,#"`
 		Age       uint    `fixed:"31,33,right,#"`
+		Alive     bool    `fixed:"34,39,right,#"`
 	}{
-		{1, "Ian", "Lopshire", 99.5, 20},
+		{1, "Ian", "Lopshire", 99.5, 20, true},
 	}
 
 	data, err := Marshal(people)
@@ -49,7 +51,7 @@ func ExampleMarshal_configurableFormatting() {
 	}
 	fmt.Printf("%s", data)
 	// Output:
-	// ####1#######Ian##Lopshire99.50#20
+	// ####1#######Ian##Lopshire99.50#20##true
 }
 
 func TestMarshal(t *testing.T) {
@@ -64,6 +66,8 @@ func TestMarshal(t *testing.T) {
 	}{"foo", "foo", "foo"}
 	marshalError := errors.New("marshal error")
 
+	var invtype func()
+
 	for _, tt := range []struct {
 		name      string
 		i         interface{}
@@ -75,8 +79,8 @@ func TestMarshal(t *testing.T) {
 		{"empty slice", []H{}, nil, false},
 		{"pointer", &H{"foo", 1}, []byte("foo  1    "), false},
 		{"nil", nil, nil, false},
-		{"invalid type", true, nil, true},
-		{"invalid type in struct", H{"foo", true}, nil, true},
+		{"invalid type", invtype, nil, true},
+		{"invalid type in struct", H{"foo", invtype}, nil, true},
 		{"marshal error", EncodableString{"", marshalError}, nil, true},
 		{"invalid tags", tagHelper, []byte("foo  "), false},
 	} {
@@ -178,7 +182,6 @@ func TestNewValueEncoder(t *testing.T) {
 
 		{"[]string (invalid)", []string{"a", "b"}, []byte(""), true},
 		{"[]string interface (invalid)", interface{}([]string{"a", "b"}), []byte(""), true},
-		{"bool (invalid)", true, []byte(""), true},
 
 		{"string", "foo", []byte("foo"), false},
 		{"string interface", interface{}("foo"), []byte("foo"), false},
@@ -207,6 +210,11 @@ func TestNewValueEncoder(t *testing.T) {
 		{"*int", intp(123), []byte("123"), false},
 		{"*int zero", intp(0), []byte("0"), false},
 		{"*int nil", nilInt, []byte(""), false},
+
+		{"bool positive", bool(true), []byte("true"), false},
+		{"bool interface positive", interface{}(bool(true)), []byte("true"), false},
+		{"*bool positive", boolp(true), []byte("true"), false},
+		{"*bool negative", boolp(false), []byte("false"), false},
 
 		{"TextUnmarshaler", EncodableString{"foo", nil}, []byte("foo"), false},
 		{"TextUnmarshaler interface", interface{}(EncodableString{"foo", nil}), []byte("foo"), false},

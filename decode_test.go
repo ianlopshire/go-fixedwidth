@@ -18,13 +18,16 @@ func ExampleUnmarshal() {
 		LastName  string  `fixed:"16,25"`
 		Grade     float64 `fixed:"26,30"`
 		Age       uint    `fixed:"31,33"`
+		Alive     bool    `fixed:"34,39"`
+		Github    bool    `fixed:"40,41"`
 	}
 
 	// define some fixed-with data to parse
 	data := []byte("" +
-		"1    Ian       Lopshire  99.50 20" + "\n" +
-		"2    John      Doe       89.50 21" + "\n" +
-		"3    Jane      Doe       79.50 22" + "\n")
+		"1    Ian       Lopshire  99.50 20 false f" + "\n" +
+		"2    John      Doe       89.50 21 true t" + "\n" +
+		"3    Jane      Doe       79.50 22 false F" + "\n" +
+		"4    Ann       Carraway  79.59 23 false T" + "\n")
 
 	err := Unmarshal(data, &people)
 	if err != nil {
@@ -34,10 +37,12 @@ func ExampleUnmarshal() {
 	fmt.Printf("%+v\n", people[0])
 	fmt.Printf("%+v\n", people[1])
 	fmt.Printf("%+v\n", people[2])
+	fmt.Printf("%+v\n", people[3])
 	// Output:
-	//{ID:1 FirstName:Ian LastName:Lopshire Grade:99.5 Age:20}
-	//{ID:2 FirstName:John LastName:Doe Grade:89.5 Age:21}
-	//{ID:3 FirstName:Jane LastName:Doe Grade:79.5 Age:22}
+	//{ID:1 FirstName:Ian LastName:Lopshire Grade:99.5 Age:20 Alive:false Github:false}
+	//{ID:2 FirstName:John LastName:Doe Grade:89.5 Age:21 Alive:true Github:true}
+	//{ID:3 FirstName:Jane LastName:Doe Grade:79.5 Age:22 Alive:false Github:false}
+	//{ID:4 FirstName:Ann LastName:Carraway Grade:79.59 Age:23 Alive:false Github:true}
 }
 
 func TestUnmarshal(t *testing.T) {
@@ -48,6 +53,8 @@ func TestUnmarshal(t *testing.T) {
 		Float           float64         `fixed:"11,15"`
 		TextUnmarshaler EncodableString `fixed:"16,20"`
 		Uint            uint            `fixed:"21,25"`
+		LongBool        bool            `fixed:"26,31"`
+		ShortBool       bool            `fixed:"32,33"`
 	}
 	for _, tt := range []struct {
 		name      string
@@ -58,40 +65,50 @@ func TestUnmarshal(t *testing.T) {
 	}{
 		{
 			name:     "Slice Case (no trailing new line)",
-			rawValue: []byte("foo  123  1.2  bar  12345" + "\n" + "bar  321  2.1  foo  54321"),
+			rawValue: []byte("foo  123  1.2  bar  12345 false f" + "\n" + "bar  321  2.1  foo  54321 true t some_other_log_here"),
 			target:   &[]allTypes{},
 			expected: &[]allTypes{
-				{"foo", 123, 1.2, EncodableString{"bar", nil}, uint(12345)},
-				{"bar", 321, 2.1, EncodableString{"foo", nil}, uint(54321)},
+				{"foo", 123, 1.2, EncodableString{"bar", nil}, uint(12345), false, false},
+				{"bar", 321, 2.1, EncodableString{"foo", nil}, uint(54321), true, true},
 			},
 			shouldErr: false,
 		},
 		{
 			name:     "Slice Case (trailing new line)",
-			rawValue: []byte("foo  123  1.2  bar  12345" + "\n" + "bar  321  2.1  foo  54321" + "\n"),
+			rawValue: []byte("foo  123  1.2  bar  12345 false f" + "\n" + "bar  321  2.1  foo  54321 true t" + "\n"),
 			target:   &[]allTypes{},
 			expected: &[]allTypes{
-				{"foo", 123, 1.2, EncodableString{"bar", nil}, uint(12345)},
-				{"bar", 321, 2.1, EncodableString{"foo", nil}, uint(54321)},
+				{"foo", 123, 1.2, EncodableString{"bar", nil}, uint(12345), false, false},
+				{"bar", 321, 2.1, EncodableString{"foo", nil}, uint(54321), true, true},
 			},
 			shouldErr: false,
 		},
 		{
 			name:     "Slice Case (blank line mid file)",
-			rawValue: []byte("foo  123  1.2  bar  12345" + "\n" + "\n" + "bar  321  2.1  foo  54321" + "\n"),
+			rawValue: []byte("foo  123  1.2  bar  12345 false F" + "\n" + "\n" + "bar  321  2.1  foo  54321 true T" + "\n"),
 			target:   &[]allTypes{},
 			expected: &[]allTypes{
-				{"foo", 123, 1.2, EncodableString{"bar", nil}, uint(12345)},
-				{"", 0, 0, EncodableString{"", nil}, uint(0)},
-				{"bar", 321, 2.1, EncodableString{"foo", nil}, uint(54321)},
+				{"foo", 123, 1.2, EncodableString{"bar", nil}, uint(12345), false, false},
+				{"", 0, 0, EncodableString{"", nil}, uint(0), false, false},
+				{"bar", 321, 2.1, EncodableString{"foo", nil}, uint(54321), true, true},
+			},
+			shouldErr: false,
+		},
+		{
+			name:     "Slice Case (no trailing new line) with empty content",
+			rawValue: []byte("foo  123  1.2  bar  12345 false  " + "\n" + "bar  321  2.1  foo  54321 true t some_other_log_here"),
+			target:   &[]allTypes{},
+			expected: &[]allTypes{
+				{"foo", 123, 1.2, EncodableString{"bar", nil}, uint(12345), false, false},
+				{"bar", 321, 2.1, EncodableString{"foo", nil}, uint(54321), true, true},
 			},
 			shouldErr: false,
 		},
 		{
 			name:      "Basic Struct Case",
-			rawValue:  []byte("foo  123  1.2  bar  12345"),
+			rawValue:  []byte("foo  123  1.2  bar  12345 false f"),
 			target:    &allTypes{},
-			expected:  &allTypes{"foo", 123, 1.2, EncodableString{"bar", nil}, uint(12345)},
+			expected:  &allTypes{"foo", 123, 1.2, EncodableString{"bar", nil}, uint(12345), false, false},
 			shouldErr: false,
 		},
 		{
@@ -110,7 +127,7 @@ func TestUnmarshal(t *testing.T) {
 		},
 		{
 			name:      "Invalid Target",
-			rawValue:  []byte("foo  123  1.2  bar  baz"),
+			rawValue:  []byte("foo  123  1.2  bar  baz false"),
 			target:    allTypes{},
 			expected:  allTypes{},
 			shouldErr: true,
@@ -273,6 +290,18 @@ func TestNewValueSetter(t *testing.T) {
 		{"uint16", []byte("1"), uint16(1), false},
 		{"uint32", []byte("1"), uint32(1), false},
 		{"uint64", []byte("1"), uint64(1), false},
+
+		{"bool negative", []byte("false"), bool(false), false},
+		{"bool positive", []byte("true"), bool(true), false},
+		{"bool empty", []byte(""), bool(false), false},
+		{"*bool positive", []byte("true"), boolp(true), false},
+		{"*bool negative", []byte("0"), boolp(false), false},
+		{"*bool empty", []byte(""), (*bool)(nil), false},
+		{"bool Invalid", []byte("foo"), bool(true), true},
+		{"short bool negative (lowercase)", []byte("f"), bool(false), false},
+		{"short bool positive (lowercase)", []byte("t"), bool(true), false},
+		{"short bool negative (uppercase)", []byte("F"), bool(false), false},
+		{"short bool positive (uppercase)", []byte("T"), bool(true), false},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			// ensure we have an addressable target

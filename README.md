@@ -27,17 +27,19 @@ people := []struct {
     LastName  string  `fixed:"16,25"`
     Grade     float64 `fixed:"26,30"`
     Age       uint    `fixed:"31,33"`
+    Alive     bool    `fixed:"34,39"`
 }{
-    {1, "Ian", "Lopshire", 99.5, 20},
+    {1, "Ian", "Lopshire", 99.5, 20, true},
 }
 
-data, err := fixedwidth.Marshal(people)
+data, err := Marshal(people)
 if err != nil {
     log.Fatal(err)
 }
 fmt.Printf("%s", data)
 // Output:
-// 1    Ian       Lopshire  99.5020
+// 1    Ian       Lopshire  99.5020 true
+
 ```
 
 ### Decode
@@ -49,16 +51,18 @@ var people []struct {
     LastName  string  `fixed:"16,25"`
     Grade     float64 `fixed:"26,30"`
     Age       uint    `fixed:"31,33"`
+    Alive     bool    `fixed:"34,39"`
+    Github    bool    `fixed:"40,41"`
 }
 
 // define some fixed-with data to parse
 data := []byte("" +
-    "1    Ian       Lopshire  99.50 20" + "\n" +
-    "2    John      Doe       89.50 21" + "\n" +
-    "3    Jane      Doe       79.50 22" + "\n")
+    "1    Ian       Lopshire  99.50 20 false f" + "\n" +
+    "2    John      Doe       89.50 21 true t" + "\n" +
+    "3    Jane      Doe       79.50 22 false F" + "\n" +
+    "4    Ann       Carraway  79.59 23 false T" + "\n")
 
-
-err := fixedwidth.Unmarshal(data, &people)
+err := Unmarshal(data, &people)
 if err != nil {
     log.Fatal(err)
 }
@@ -66,10 +70,12 @@ if err != nil {
 fmt.Printf("%+v\n", people[0])
 fmt.Printf("%+v\n", people[1])
 fmt.Printf("%+v\n", people[2])
+fmt.Printf("%+v\n", people[3])
 // Output:
-//{ID:1 FirstName:Ian LastName:Lopshire Grade:99.5 Age:20}
-//{ID:2 FirstName:John LastName:Doe Grade:89.5 Age:21}
-//{ID:3 FirstName:Jane LastName:Doe Grade:79.5 Age:22}
+//{ID:1 FirstName:Ian LastName:Lopshire Grade:99.5 Age:20 Alive:false Github:false}
+//{ID:2 FirstName:John LastName:Doe Grade:89.5 Age:21 Alive:true Github:true}
+//{ID:3 FirstName:Jane LastName:Doe Grade:79.5 Age:22 Alive:false Github:false}
+//{ID:4 FirstName:Ann LastName:Carraway Grade:79.59 Age:23 Alive:false Github:true}
 ```
 
 It is also possible to read data incrementally
