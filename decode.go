@@ -9,7 +9,6 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-	"unicode/utf8"
 )
 
 // Unmarshal parses fixed width encoded data and stores the
@@ -132,54 +131,6 @@ func (d *Decoder) readLines(v reflect.Value) (err error) {
 		}
 	}
 	return nil
-}
-
-type rawValue struct {
-	data string
-	// Used when `SetUseCodepointIndices` has been called on `Decoder`. A
-	// mapping of codepoint indices into the bytes. So the
-	// `codepointIndices[n]` is the starting position for the n-th codepoint in
-	// `bytes`.
-	codepointIndices []int
-}
-
-func newRawValue(data string, useCodepointIndices bool) (rawValue, error) {
-	value := rawValue{
-		data: data,
-	}
-	if useCodepointIndices {
-		bytesIdx := findFirstMultiByteChar(data)
-		// If we've got multi-byte characters, fill in the rest of codepointIndices.
-		if bytesIdx < len(data) {
-			codepointIndices := make([]int, bytesIdx)
-			for i := 0; i < bytesIdx; i++ {
-				codepointIndices[i] = i
-			}
-			for bytesIdx < len(data) {
-				_, codepointSize := utf8.DecodeRuneInString(data[bytesIdx:])
-				if codepointSize == 0 {
-					return rawValue{}, errors.New("fixedwidth: Invalid codepoint")
-				}
-				codepointIndices = append(codepointIndices, bytesIdx)
-				bytesIdx += codepointSize
-			}
-			value.codepointIndices = codepointIndices
-		}
-	}
-	return value, nil
-}
-
-// Scans bytes, looking for multi-byte characters, returns either the index of
-// the first multi-byte chracter or the length of the string if there are none.
-func findFirstMultiByteChar(data string) int {
-	for i := 0; i < len(data); i++ {
-		// We have a multi-byte codepoint, we need to allocate
-		// codepointIndices
-		if data[i]&0x80 == 0x80 {
-			return i
-		}
-	}
-	return len(data)
 }
 
 // SetLineTerminator sets the character(s) that will be used to terminate lines.
