@@ -64,9 +64,21 @@ type structSpec struct {
 type fieldSpec struct {
 	startPos, endPos int
 	encoder          valueEncoder
+	codepointEncoder valueEncoder
 	setter           valueSetter
 	format           format
 	ok               bool
+}
+
+func (s fieldSpec) len() int {
+	return s.endPos - s.startPos + 1
+}
+
+func (s fieldSpec) getEncoder(useCodepointIndices bool) valueEncoder {
+	if useCodepointIndices {
+		return s.codepointEncoder
+	}
+	return s.encoder
 }
 
 func buildStructSpec(t reflect.Type) structSpec {
@@ -90,7 +102,8 @@ func buildStructSpec(t reflect.Type) structSpec {
 			ss.ll = ss.fieldSpecs[i].endPos
 		}
 
-		ss.fieldSpecs[i].encoder = newValueEncoder(f.Type)
+		ss.fieldSpecs[i].encoder = newValueEncoder(f.Type, false)
+		ss.fieldSpecs[i].codepointEncoder = newValueEncoder(f.Type, true)
 		ss.fieldSpecs[i].setter = newValueSetter(f.Type)
 	}
 	return ss

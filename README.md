@@ -39,7 +39,6 @@ if err != nil {
 fmt.Printf("%s", data)
 // Output:
 // 1    Ian       Lopshire  99.5020 true
-
 ```
 
 ### Decode
@@ -95,13 +94,23 @@ for {
 }
 ```
 
-If you have an input where the indices are expressed in unicode codepoints, and
-not raw bytes fixedwidth supports this. Your data must be UTF-8 encoded:
+### UTF-8, Codepoints, and Multibyte Characters
+
+fixedwidth supports encoding and decoding fixed-width data where indices are expressed in
+unicode codepoints and not raw bytes. The data must be UTF-8 encoded.
 
 ```go
 decoder := fixedwidth.NewDecoder(strings.NewReader(data))
 decoder.SetUseCodepointIndices(true)
 // Decode as usual now
+```
+
+
+```go
+buff := new(bytes.Buffer)
+encoder := fixedwidth.NewEncoder(buff)
+encoder.SetUseCodepointIndices(true)
+// Encode as usual now
 ```
 
 ### Alignment Behavior

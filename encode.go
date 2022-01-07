@@ -7,6 +7,7 @@ import (
 	"io"
 	"reflect"
 	"strconv"
+	"strings"
 )
 
 // Marshal returns the fixed-width encoding of v.
@@ -60,6 +61,8 @@ func (e *MarshalInvalidTypeError) Error() string {
 type Encoder struct {
 	w              *bufio.Writer
 	lineTerminator []byte
+
+	useCodepointIndices bool
 }
 
 // NewEncoder returns a new encoder that writes to w.
@@ -75,6 +78,13 @@ func NewEncoder(w io.Writer) *Encoder {
 // The default value is "\n".
 func (e *Encoder) SetLineTerminator(lineTerminator []byte) {
 	e.lineTerminator = lineTerminator
+}
+
+// SetUseCodepointIndices configures `Encoder` on whether the indices in the
+// `fixedwidth` struct tags are expressed in terms of bytes (the default
+// behavior) or in terms of UTF-8 decoded codepoints.
+func (e *Encoder) SetUseCodepointIndices(use bool) {
+	e.useCodepointIndices = use
 }
 
 // Encode writes the fixed-width encoding of v to the
@@ -122,31 +132,31 @@ func (e *Encoder) writeLines(v reflect.Value) error {
 }
 
 func (e *Encoder) writeLine(v reflect.Value) (err error) {
-	b, err := newValueEncoder(v.Type())(v)
+	b, err := newValueEncoder(v.Type(), e.useCodepointIndices)(v)
 	if err != nil {
 		return err
 	}
-	_, err = e.w.Write(b)
+	_, err = e.w.WriteString(b.data)
 	return err
 }
 
-type valueEncoder func(v reflect.Value) ([]byte, error)
+type valueEncoder func(v reflect.Value) (rawValue, error)
 
-func newValueEncoder(t reflect.Type) valueEncoder {
+func newValueEncoder(t reflect.Type, useCodepointIndices bool) valueEncoder {
 	if t == nil {
 		return nilEncoder
 	}
 	if t.Implements(reflect.TypeOf(new(encoding.TextMarshaler)).Elem()) {
-		return textMarshalerEncoder
+		return textMarshalerEncoder(useCodepointIndices)
 	}
 
 	switch t.Kind() {
 	case reflect.Ptr, reflect.Interface:
-		return ptrInterfaceEncoder
+		return ptrInterfaceEncoder(useCodepointIndices)
 	case reflect.Struct:
-		return structEncoder
+		return structEncoder(useCodepointIndices)
 	case reflect.String:
-		return stringEncoder
+		return stringEncoder(useCodepointIndices)
 	case reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8:
 		return intEncoder
 	case reflect.Float64:
@@ -161,18 +171,20 @@ func newValueEncoder(t reflect.Type) valueEncoder {
 	return unknownTypeEncoder(t)
 }
 
-func (ve valueEncoder) Write(v reflect.Value, dst []byte, format format) error {
+func (ve valueEncoder) Write(b *lineBuilder, v reflect.Value, spec fieldSpec) error {
+	format := spec.format
+	startIndex := spec.startPos - 1
 	value, err := ve(v)
 	if err != nil {
 		return err
 	}
 
-	if len(value) < len(dst) {
+	if value.len() < spec.len() {
 		switch {
-		case format.alignment == right:
-			padding := bytes.Repeat([]byte{format.padChar}, len(dst)-len(value))
-			copy(dst, padding)
-			copy(dst[len(padding):], value)
+		case spec.format.alignment == right:
+			padding := strings.Repeat(string(format.padChar), spec.len()-value.len())
+			b.WriteASCII(startIndex, padding)
+			b.WriteValue(startIndex+len(padding), value)
 			return nil
 
 		// The second case in this block is a special case to maintain backward
@@ -180,74 +192,102 @@ func (ve valueEncoder) Write(v reflect.Value, dst []byte, format format) error {
 		// written to dst. This means overlapping intervals can, in effect, be used to
 		// coalesce a value.
 		case format.alignment == left, format.alignment == defaultAlignment && format.padChar != ' ':
-			padding := bytes.Repeat([]byte{format.padChar}, len(dst)-len(value))
-			copy(dst, value)
-			copy(dst[len(value):], padding)
+			padding := strings.Repeat(string(format.padChar), spec.len()-value.len())
+
+			b.WriteValue(startIndex, value)
+			b.WriteASCII(startIndex+value.len(), padding)
 			return nil
 		}
 	}
 
-	copy(dst, value)
+	if value.len() > spec.len() {
+		// If the value is too long it needs to be trimmed.
+		// TODO: Add strict mode that returns in this case.
+		value, err = value.slice(0, spec.len()-1)
+		if err != nil {
+			return err
+		}
+	}
+
+	b.WriteValue(startIndex, value)
 	return nil
 }
 
-func structEncoder(v reflect.Value) ([]byte, error) {
-	ss := cachedStructSpec(v.Type())
-	dst := bytes.Repeat([]byte(" "), ss.ll)
+func structEncoder(useCodepointIndices bool) valueEncoder {
+	return func(v reflect.Value) (rawValue, error) {
+		ss := cachedStructSpec(v.Type())
 
-	for i, spec := range ss.fieldSpecs {
-		if !spec.ok {
-			continue
+		// Add a 10% headroom to the builder when codepoint indices are being used.
+		c := ss.ll
+		if useCodepointIndices {
+			c = int(1.1*float64(ss.ll)) + 1
+		}
+		b := newLineBuilder(ss.ll, c, ' ')
+
+		for i, spec := range ss.fieldSpecs {
+			if !spec.ok {
+				continue
+			}
+
+			enc := spec.getEncoder(useCodepointIndices)
+			err := enc.Write(b, v.Field(i), spec)
+			if err != nil {
+				return rawValue{}, err
+			}
 		}
 
-		err := spec.encoder.Write(v.Field(i), dst[spec.startPos-1:spec.endPos:spec.endPos], spec.format)
+		return b.AsRawValue(), nil
+	}
+}
+
+func textMarshalerEncoder(useCodepointIndices bool) valueEncoder {
+	return func(v reflect.Value) (rawValue, error) {
+		txt, err := v.Interface().(encoding.TextMarshaler).MarshalText()
 		if err != nil {
-			return nil, err
+			return rawValue{}, err
 		}
+		return newRawValue(string(txt), useCodepointIndices)
 	}
-
-	return dst, nil
 }
 
-func textMarshalerEncoder(v reflect.Value) ([]byte, error) {
-	return v.Interface().(encoding.TextMarshaler).MarshalText()
-}
-
-func ptrInterfaceEncoder(v reflect.Value) ([]byte, error) {
-	if v.IsNil() {
-		return nilEncoder(v)
+func ptrInterfaceEncoder(useCodepointIndices bool) valueEncoder {
+	return func(v reflect.Value) (rawValue, error) {
+		if v.IsNil() {
+			return nilEncoder(v)
+		}
+		return newValueEncoder(v.Elem().Type(), useCodepointIndices)(v.Elem())
 	}
-	return newValueEncoder(v.Elem().Type())(v.Elem())
 }
 
-func stringEncoder(v reflect.Value) ([]byte, error) {
-	return []byte(v.String()), nil
+func stringEncoder(useCodepointIndices bool) valueEncoder {
+	return func(v reflect.Value) (rawValue, error) {
+		return newRawValue(v.String(), useCodepointIndices)
+	}
 }
-
-func intEncoder(v reflect.Value) ([]byte, error) {
-	return []byte(strconv.Itoa(int(v.Int()))), nil
+func intEncoder(v reflect.Value) (rawValue, error) {
+	return newRawValue(strconv.Itoa(int(v.Int())), false)
 }
 
 func floatEncoder(perc, bitSize int) valueEncoder {
-	return func(v reflect.Value) ([]byte, error) {
-		return []byte(strconv.FormatFloat(v.Float(), 'f', perc, bitSize)), nil
+	return func(v reflect.Value) (rawValue, error) {
+		return newRawValue(strconv.FormatFloat(v.Float(), 'f', perc, bitSize), false)
 	}
 }
 
-func boolEncoder(v reflect.Value) ([]byte, error) {
-	return []byte(strconv.FormatBool(v.Bool())), nil
+func boolEncoder(v reflect.Value) (rawValue, error) {
+	return newRawValue(strconv.FormatBool(v.Bool()), false)
 }
 
-func nilEncoder(v reflect.Value) ([]byte, error) {
-	return nil, nil
+func nilEncoder(_ reflect.Value) (rawValue, error) {
+	return rawValue{}, nil
 }
 
 func unknownTypeEncoder(t reflect.Type) valueEncoder {
-	return func(value reflect.Value) ([]byte, error) {
-		return nil, &MarshalInvalidTypeError{typeName: t.Name()}
+	return func(value reflect.Value) (rawValue, error) {
+		return rawValue{}, &MarshalInvalidTypeError{typeName: t.Name()}
 	}
 }
 
-func uintEncoder(v reflect.Value) ([]byte, error) {
-	return []byte(strconv.FormatUint(v.Uint(), 10)), nil
+func uintEncoder(v reflect.Value) (rawValue, error) {
+	return newRawValue(strconv.FormatUint(v.Uint(), 10), false)
 }
