@@ -1,6 +1,7 @@
 package fixedwidth
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 )
@@ -48,6 +49,25 @@ func TestParseTag(t *testing.T) {
 				if !reflect.DeepEqual(tt.format, format) {
 					t.Errorf("parseTagWithFormat() format want %+v, have %+v", tt.format, format)
 				}
+			}
+		})
+	}
+}
+
+func TestFieldSpec_len(t *testing.T) {
+	for _, tt := range []struct {
+		spec fieldSpec
+		want int
+	}{
+		{fieldSpec{startPos: 1, endPos: 1}, 1},
+		{fieldSpec{startPos: 1, endPos: 5}, 5},
+		{fieldSpec{startPos: 5, endPos: 5}, 1},
+		{fieldSpec{startPos: 6, endPos: 10}, 5},
+	} {
+		t.Run(fmt.Sprintf("%v to %v", tt.spec.startPos, tt.spec.endPos), func(t *testing.T) {
+			if l := tt.spec.len(); l != tt.want {
+				t.Errorf("len() expected %v, have %v", tt.want, l)
+
 			}
 		})
 	}

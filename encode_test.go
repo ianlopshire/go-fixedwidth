@@ -59,6 +59,9 @@ func TestMarshal(t *testing.T) {
 		F1 interface{} `fixed:"1,5"`
 		F2 interface{} `fixed:"6,10"`
 	}
+	type H2 struct {
+		F1 bool `fixed:"1,1"`
+	}
 	tagHelper := struct {
 		Valid       string `fixed:"1,5"`
 		NoTags      string
@@ -76,6 +79,7 @@ func TestMarshal(t *testing.T) {
 	}{
 		{"single line", H{"foo", 1}, []byte("foo  1    "), false},
 		{"multiple line", []H{{"foo", 1}, {"bar", 2}}, []byte("foo  1    \nbar  2    "), false},
+		{"multiple line (diff struct)", []interface{}{H{"foo", 1}, H2{false}}, []byte("foo  1    \nf"), false},
 		{"empty slice", []H{}, nil, false},
 		{"pointer", &H{"foo", 1}, []byte("foo  1    "), false},
 		{"nil", nil, nil, false},
@@ -90,6 +94,59 @@ func TestMarshal(t *testing.T) {
 				t.Errorf("Marshal() shouldErr expected %v, have %v (%v)", tt.shouldErr, err != nil, err)
 			}
 			if !tt.shouldErr && !bytes.Equal(o, tt.o) {
+				t.Errorf("Marshal() expected %q, have %q", string(tt.o), string(o))
+			}
+
+			// All tests should also pass with codepoint indices enabled.
+			t.Run("use codepoint indices", func(t *testing.T) {
+				buff := bytes.NewBuffer(nil)
+				enc := NewEncoder(buff)
+				enc.SetUseCodepointIndices(true)
+				err := enc.Encode(tt.i)
+				if tt.shouldErr != (err != nil) {
+					t.Errorf("Marshal() shouldErr expected %v, have %v (%v)", tt.shouldErr, err != nil, err)
+				}
+				if !tt.shouldErr && !bytes.Equal(buff.Bytes(), tt.o) {
+					t.Errorf("Marshal() expected %q, have %q", string(tt.o), string(o))
+				}
+			})
+
+		})
+	}
+}
+
+func TestMarshal_useCodepointIndices(t *testing.T) {
+	type H struct {
+		F1 string `fixed:"1,5"`
+		F2 string `fixed:"6,10"`
+		F3 string `fixed:"11,15"`
+	}
+
+	type HF struct {
+		F1 string `fixed:"1,5,right,#"`
+		F2 string `fixed:"6,10,left,#"`
+		F3 string `fixed:"11,15"`
+	}
+
+	for _, tt := range []struct {
+		name string
+		i    interface{}
+		o    []byte
+	}{
+		{name: "base case", i: H{"føø", "bår", "båz"}, o: []byte(`føø  bår  båz  `)},
+		{name: "overflow", i: H{"føøøøøøøøøø", "bååååååååår", "bååååååååz"}, o: []byte(`føøøøbååååbåååå`)},
+		{name: "formatted", i: HF{"føø", "bår", "båz"}, o: []byte(`##føøbår##båz  `)},
+		{name: "multibformatted overflow", i: HF{"føøøøøøøøøø", "bååååååååår", "bååååååååz"}, o: []byte(`føøøøbååååbåååå`)},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			buff := bytes.NewBuffer(nil)
+			enc := NewEncoder(buff)
+			enc.SetUseCodepointIndices(true)
+			if err := enc.Encode(tt.i); err != nil {
+				t.Errorf("Marshal() unexpected error:  %v", err)
+				return
+			}
+			if o := buff.Bytes(); !bytes.Equal(o, tt.o) {
 				t.Errorf("Marshal() expected %s, have %s", tt.o, o)
 			}
 		})
@@ -128,6 +185,22 @@ func TestMarshal_format(t *testing.T) {
 			name:      "overflow",
 			v:         H{"12345678", "12345678", "12345678", "12345678", "12345678", "12345678"},
 			want:      []byte(`12345` + `12345` + `12345` + `12345` + `12345` + `12345`),
+			shouldErr: false,
+		},
+		{
+			name: "pad right",
+			v: struct {
+				F1 string `fixed:"1,5,right,#"`
+			}{"foo"},
+			want:      []byte(`##foo`),
+			shouldErr: false,
+		},
+		{
+			name: "pad left",
+			v: struct {
+				F1 string `fixed:"1,5,left,#"`
+			}{"foo"},
+			want:      []byte(`foo##`),
 			shouldErr: false,
 		},
 	} {
@@ -228,11 +301,11 @@ func TestNewValueEncoder(t *testing.T) {
 		{"*uint nil", nilUint, []byte(""), false},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			o, err := newValueEncoder(reflect.TypeOf(tt.i))(reflect.ValueOf(tt.i))
+			o, err := newValueEncoder(reflect.TypeOf(tt.i), false)(reflect.ValueOf(tt.i))
 			if tt.shouldErr != (err != nil) {
 				t.Errorf("newValueEncoder(%s)() shouldErr expected %v, have %v (%v)", reflect.TypeOf(tt.i).Name(), tt.shouldErr, err != nil, err)
 			}
-			if !tt.shouldErr && !bytes.Equal(o, tt.o) {
+			if !tt.shouldErr && !bytes.Equal([]byte(o.data), tt.o) {
 				t.Errorf("newValueEncoder(%s)() expected %v, have %v", reflect.TypeOf(tt.i).Name(), tt.o, o)
 			}
 		})
