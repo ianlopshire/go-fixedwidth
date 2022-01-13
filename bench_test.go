@@ -145,6 +145,58 @@ func BenchmarkMarshal_MixedData_100000(b *testing.B) {
 	}
 }
 
+func BenchmarkEncode_CodePoints_MixedData_1_Ascii(b *testing.B) {
+	v := mixedData{
+		F1:  "foo",
+		F2:  stringp("foo"),
+		F3:  42,
+		F4:  int64p(42),
+		F5:  42,
+		F6:  int32p(42),
+		F7:  42,
+		F8:  int16p(42),
+		F9:  42,
+		F10: int8p(8),
+		F11: 42,
+		F12: float64p(42),
+		F13: 42,
+		F14: false,
+		F15: true,
+	}
+	for i := 0; i < b.N; i++ {
+		buff := new(bytes.Buffer)
+		d := NewEncoder(buff)
+		d.SetUseCodepointIndices(true)
+		_ = d.Encode(v)
+	}
+}
+
+func BenchmarkEncode_CodePoints_MixedData_1_UTF8(b *testing.B) {
+	v := mixedData{
+		F1:  "f☃☃",
+		F2:  stringp("f☃☃"),
+		F3:  42,
+		F4:  int64p(42),
+		F5:  42,
+		F6:  int32p(42),
+		F7:  42,
+		F8:  int16p(42),
+		F9:  42,
+		F10: int8p(8),
+		F11: 42,
+		F12: float64p(42),
+		F13: 42,
+		F14: false,
+		F15: true,
+	}
+	for i := 0; i < b.N; i++ {
+		buff := new(bytes.Buffer)
+		d := NewEncoder(buff)
+		d.SetUseCodepointIndices(true)
+		_ = d.Encode(v)
+	}
+}
+
 func BenchmarkMarshal_String(b *testing.B) {
 	v := struct {
 		F1 string `fixed:"1,10"`
