@@ -2,12 +2,11 @@ package fixedwidth
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"log"
 	"reflect"
 	"testing"
-
-	"github.com/pkg/errors"
 )
 
 func ExampleMarshal() {
@@ -147,7 +146,7 @@ func TestMarshal_useCodepointIndices(t *testing.T) {
 				return
 			}
 			if o := buff.Bytes(); !bytes.Equal(o, tt.o) {
-				t.Errorf("Marshal() expected %s, have %s", tt.o, o)
+				t.Errorf("Marshal() expected %q, have %q", string(tt.o), string(o))
 			}
 		})
 	}
