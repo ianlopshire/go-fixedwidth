@@ -63,6 +63,9 @@ type Encoder struct {
 	lineTerminator []byte
 
 	useCodepointIndices bool
+
+	lastType         reflect.Type
+	lastValueEncoder valueEncoder
 }
 
 // NewEncoder returns a new encoder that writes to w.
@@ -132,7 +135,15 @@ func (e *Encoder) writeLines(v reflect.Value) error {
 }
 
 func (e *Encoder) writeLine(v reflect.Value) (err error) {
-	b, err := newValueEncoder(v.Type(), e.useCodepointIndices)(v)
+	t := v.Type()
+	encoder := e.lastValueEncoder
+	if e.lastType != t {
+		e.lastType = t
+		e.lastValueEncoder = newValueEncoder(t, e.useCodepointIndices)
+		encoder = e.lastValueEncoder
+	}
+
+	b, err := encoder(v)
 	if err != nil {
 		return err
 	}
