@@ -11,6 +11,12 @@ import (
 	"strings"
 )
 
+var (
+	// ErrTooLong indicates a line was too long to decode. Currently, the maximum
+	// decodable line length is bufio.MaxScanTokenSize-1.
+	ErrTooLong = bufio.ErrTooLong
+)
+
 // Unmarshal parses fixed width encoded data and stores the
 // result in the value pointed to by v. If v is nil or not a
 // pointer, Unmarshal returns an InvalidUnmarshalError.
@@ -95,6 +101,9 @@ func (d *Decoder) SetUseCodepointIndices(use bool) {
 //
 // In the case that v points to a slice value, Decode will read until
 // the end of its input.
+//
+// Currently, the maximum decodable line length is bufio.MaxScanTokenSize-1. ErrTooLong
+// is returned if a line is encountered that too long to decode.
 func (d *Decoder) Decode(v interface{}) error {
 	rv := reflect.ValueOf(v)
 	if rv.Kind() != reflect.Ptr || rv.IsNil() {
@@ -158,9 +167,15 @@ func (d *Decoder) scan(data []byte, atEOF bool) (advance int, token []byte, err 
 	return 0, nil, nil
 }
 
+// readLine reads the next line of data. False is returned if there is no remaining data
+// to read.
 func (d *Decoder) readLine(v reflect.Value) (err error, ok bool) {
 	ok = d.scanner.Scan()
 	if !ok {
+		if d.scanner.Err() != nil {
+			return d.scanner.Err(), false
+		}
+
 		d.done = true
 		return nil, false
 	}

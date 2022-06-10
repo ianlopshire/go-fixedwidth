@@ -1,6 +1,7 @@
 package fixedwidth
 
 import (
+	"bufio"
 	"bytes"
 	"encoding"
 	"fmt"
@@ -393,6 +394,22 @@ func TestDecode_EOF(t *testing.T) {
 	err = d.Decode(&s)
 	if err != io.EOF {
 		t.Errorf("Decode should have returned an EOF error. Returned: %v", err)
+	}
+}
+
+// Verify that lines longer than the bufio.Scanner buffer decode correctly. See
+// https://github.com/ianlopshire/go-fixedwidth/issues/47.
+func TestDecode_VeryLongLines(t *testing.T) {
+	var s struct {
+		Field1 string `fixed:"1,10"`
+	}
+
+	// Fill a line with bufio.MaxScanTokenSize charters.
+	data := bytes.Repeat([]byte("a"), bufio.MaxScanTokenSize)
+
+	d := NewDecoder(bytes.NewReader(data))
+	if err := d.Decode(&s); err != ErrTooLong {
+		t.Errorf("Decode should have returned ErrTooLong. Returned: %v", err)
 	}
 }
 
