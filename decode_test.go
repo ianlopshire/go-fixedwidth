@@ -463,7 +463,7 @@ func TestLineSeparator(t *testing.T) {
 		lineTerminator []byte
 	}{
 		{
-			name:     "CR line endings",
+			name:     "LF line endings",
 			rawValue: []byte("foo  123  1.2  bar" + "\n" + "bar  321  2.1  foo"),
 			target:   &[]allTypes{},
 			expected: &[]allTypes{
@@ -474,7 +474,7 @@ func TestLineSeparator(t *testing.T) {
 			lineTerminator: []byte{},
 		},
 		{
-			name:     "CR line endings",
+			name:     "LF line endings",
 			rawValue: []byte("f\ro  123  1.2  bar" + "\n" + "bar  321  2.1  foo"),
 			target:   &[]allTypes{},
 			expected: &[]allTypes{
@@ -496,7 +496,7 @@ func TestLineSeparator(t *testing.T) {
 			lineTerminator: []byte("\r\n"),
 		},
 		{
-			name:     "LF line endings",
+			name:     "CR line endings",
 			rawValue: []byte("f\no  123  1.2  bar" + "\r" + "bar  321  2.1  foo"),
 			target:   &[]allTypes{},
 			expected: &[]allTypes{
