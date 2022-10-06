@@ -127,6 +127,24 @@ func TestUnmarshal(t *testing.T) {
 			shouldErr: true,
 		},
 		{
+			name:     "Empty with new line (struct)",
+			rawValue: []byte("\n"),
+			target: &allTypes{
+				String: "hello",
+			},
+			expected:  &allTypes{},
+			shouldErr: false,
+		},
+		{
+			name:     "Empty with new line (slice)",
+			rawValue: []byte("\n"),
+			target:   &[]allTypes{},
+			expected: &[]allTypes{
+				{},
+			},
+			shouldErr: false,
+		},
+		{
 			name:      "Invalid Target",
 			rawValue:  []byte("foo  123  1.2  bar  baz false"),
 			target:    allTypes{},
