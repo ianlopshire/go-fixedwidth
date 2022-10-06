@@ -302,7 +302,21 @@ func unknownSetter(v reflect.Value, raw rawValue) error {
 }
 
 func nilSetter(v reflect.Value, _ rawValue) error {
-	v.Set(reflect.Zero(v.Type()))
+	if v.IsNil() {
+		return nil
+	}
+
+	if v.CanSet() {
+		v.Set(reflect.Zero(v.Type()))
+		return nil
+	}
+
+	v = reflect.Indirect(v)
+	if v.CanSet() {
+		v.Set(reflect.Zero(v.Type()))
+		return nil
+	}
+
 	return nil
 }
 
