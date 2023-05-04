@@ -113,6 +113,20 @@ func TestUnmarshal(t *testing.T) {
 			shouldErr: false,
 		},
 		{
+			name:      "Multi Byte Character Test - em dash",
+			rawValue:  []byte("f–o  123  1.2  bar  12345 false f"),
+			target:    &allTypes{},
+			expected:  &allTypes{"f–o", 123, 1.2, EncodableString{"bar", nil}, uint(12345), false, false},
+			shouldErr: false,
+		},
+		{
+			name:      "Multi Byte Character Test - Accent Char",
+			rawValue:  []byte("foé  123  1.2  bar  12345 false f"),
+			target:    &allTypes{},
+			expected:  &allTypes{"foé", 123, 1.2, EncodableString{"bar", nil}, uint(12345), false, false},
+			shouldErr: false,
+		},
+		{
 			name:      "Unmarshal Error",
 			rawValue:  []byte("foo  nan  ddd  bar  baz"),
 			target:    &allTypes{},

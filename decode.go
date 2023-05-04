@@ -239,7 +239,7 @@ func rawValueFromLine(value rawValue, startPos, endPos int, format format) rawVa
 			endPos = len(value.data)
 		}
 		return rawValue{
-			data: trimFunc(value.data[startPos-1 : endPos]),
+			data: trimFunc(string([]rune(value.data)[startPos-1 : endPos])),
 		}
 	}
 }
