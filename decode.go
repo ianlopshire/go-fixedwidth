@@ -184,7 +184,7 @@ func (d *Decoder) readLine(v reflect.Value) (err error, ok bool) {
 
 	rawValue, err := newRawValue(line, d.useCodepointIndices)
 	if err != nil {
-		return
+		return err, false
 	}
 	t := v.Type()
 	if t == d.lastType {
