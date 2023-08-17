@@ -242,6 +242,24 @@ func TestMarshal_backwardCompatibility(t *testing.T) {
 	})
 }
 
+func TestEncoder_regressions(t *testing.T) {
+	// Ensure the encoder doesn't panic when encoding an empty value at the end of a line
+	// that contains multi-byte characters.
+	// See: https://github.com/ianlopshire/go-fixedwidth/issues/58
+	t.Run("issue 58", func(t *testing.T) {
+		var v struct {
+			Foo string `fixed:"1,1"`
+			Bar string `fixed:"2,2,right"`
+		}
+		v.Foo = "Ç"
+
+		buf := new(bytes.Buffer)
+		e := NewEncoder(buf)
+		e.SetUseCodepointIndices(true)
+		_ = e.Encode(v)
+	})
+}
+
 func TestNewValueEncoder(t *testing.T) {
 	for _, tt := range []struct {
 		name      string

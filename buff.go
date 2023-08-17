@@ -45,6 +45,11 @@ func lineBufferFromValue(value rawValue) *lineBuilder {
 
 // WriteValue writes the given value to the lineBuilder at the give start index.
 func (b *lineBuilder) WriteValue(start int, value rawValue) {
+	// If the value is empty there is nothing to write.
+	if len(value.data) == 0 {
+		return
+	}
+
 	// Fast path for ascii only operation.
 	if !b.hasMultiByteChar() && !value.hasMultiByteChar() {
 		copy(b.data[start:], value.data)
