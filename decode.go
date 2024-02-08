@@ -227,9 +227,18 @@ func rawValueFromLine(value rawValue, startPos, endPos int, format format) rawVa
 			relevantIndices = value.codepointIndices[startPos-1 : endPos]
 			lineData = value.data[relevantIndices[0]:value.codepointIndices[endPos]]
 		}
+
+		// We trimmed data from the front of the string.
+		// We need to adjust the codepoint indices to reflect this, as they have shifted.
+		removedFromFront := relevantIndices[0]
+		newIndices := make([]int, 0, len(relevantIndices))
+		for _, idx := range relevantIndices {
+			newIndices = append(newIndices, idx-removedFromFront)
+		}
+
 		return rawValue{
 			data:             trimFunc(lineData),
-			codepointIndices: relevantIndices,
+			codepointIndices: newIndices,
 		}
 	} else {
 		if len(value.data) == 0 || startPos > len(value.data) {
