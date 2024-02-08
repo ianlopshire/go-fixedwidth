@@ -197,20 +197,26 @@ func (d *Decoder) readLine(v reflect.Value) (err error, ok bool) {
 }
 
 func rawValueFromLine(value rawValue, startPos, endPos int, format format) rawValue {
-	var trimFunc func(string) string
+	var trimFunc func(in string) (out string, leftRemoved int, rightRemoved int)
 
 	switch format.alignment {
 	case left:
-		trimFunc = func(s string) string {
-			return strings.TrimRight(s, string(format.padChar))
+		trimFunc = func(s string) (out string, leftRemoved int, rightRemoved int) {
+			out = strings.TrimRight(s, string(format.padChar))
+			return out, 0, len(s) - len(out)
 		}
 	case right:
-		trimFunc = func(s string) string {
-			return strings.TrimLeft(s, string(format.padChar))
+		trimFunc = func(s string) (out string, leftRemoved int, rightRemoved int) {
+			out = strings.TrimLeft(s, string(format.padChar))
+			return out, len(s) - len(out), 0
 		}
 	default:
-		trimFunc = func(s string) string {
-			return strings.Trim(s, string(format.padChar))
+		trimFunc = func(s string) (out string, leftRemoved int, rightRemoved int) {
+			leftTrimmed := strings.TrimLeft(s, string(format.padChar))
+			leftRemoved = len(s) - len(leftTrimmed)
+			rightTrimmed := strings.TrimRight(leftTrimmed, string(format.padChar))
+			rightRemoved = len(leftTrimmed) - len(rightTrimmed)
+			return rightTrimmed, leftRemoved, rightRemoved
 		}
 	}
 
@@ -228,17 +234,34 @@ func rawValueFromLine(value rawValue, startPos, endPos int, format format) rawVa
 			lineData = value.data[relevantIndices[0]:value.codepointIndices[endPos]]
 		}
 
-		// We trimmed data from the front of the string.
-		// We need to adjust the codepoint indices to reflect this, as they have shifted.
-		removedFromFront := relevantIndices[0]
-		newIndices := make([]int, 0, len(relevantIndices))
-		for _, idx := range relevantIndices {
-			newIndices = append(newIndices, idx-removedFromFront)
+		newIndices := relevantIndices
+		if relevantIndices[0] > 0 {
+			// We trimmed data from the front of the string.
+			// We need to adjust the codepoint indices to reflect this, as they have shifted.
+			removedFromFront := relevantIndices[0]
+			newIndices = make([]int, 0, len(relevantIndices))
+			for _, idx := range relevantIndices {
+				newIndices = append(newIndices, idx-removedFromFront)
+			}
+		}
+
+		// Trim the new line data.
+		newLineData, leftRemovedBytes, rightRemovedBytes := trimFunc(lineData)
+		trimmedIndices := newIndices
+		if leftRemovedBytes > 0 || rightRemovedBytes > 0 {
+			// We must trim our codepoint indices list in order to match
+			// the newly trimmed line data string.
+			trimmedIndices = []int{}
+			for _, idx := range newIndices {
+				if idx >= leftRemovedBytes && idx < len(lineData)-rightRemovedBytes {
+					trimmedIndices = append(trimmedIndices, idx-leftRemovedBytes)
+				}
+			}
 		}
 
 		return rawValue{
-			data:             trimFunc(lineData),
-			codepointIndices: newIndices,
+			data:             newLineData,
+			codepointIndices: trimmedIndices,
 		}
 	} else {
 		if len(value.data) == 0 || startPos > len(value.data) {
@@ -247,8 +270,9 @@ func rawValueFromLine(value rawValue, startPos, endPos int, format format) rawVa
 		if endPos > len(value.data) {
 			endPos = len(value.data)
 		}
+		newLineData, _, _ := trimFunc(value.data[startPos-1 : endPos])
 		return rawValue{
-			data: trimFunc(value.data[startPos-1 : endPos]),
+			data: newLineData,
 		}
 	}
 }
