@@ -208,6 +208,8 @@ func rawValueFromLine(value rawValue, startPos, endPos int, format format) rawVa
 		trimFunc = func(s string) string {
 			return strings.TrimLeft(s, string(format.padChar))
 		}
+	case noAlignment:
+		trimFunc = func(s string) string { return s }
 	default:
 		trimFunc = func(s string) string {
 			return strings.Trim(s, string(format.padChar))
