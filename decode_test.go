@@ -40,10 +40,10 @@ func ExampleUnmarshal() {
 	fmt.Printf("%+v\n", people[2])
 	fmt.Printf("%+v\n", people[3])
 	// Output:
-	//{ID:1 FirstName:Ian LastName:Lopshire Grade:99.5 Age:20 Alive:false Github:false}
-	//{ID:2 FirstName:John LastName:Doe Grade:89.5 Age:21 Alive:true Github:true}
-	//{ID:3 FirstName:Jane LastName:Doe Grade:79.5 Age:22 Alive:false Github:false}
-	//{ID:4 FirstName:Ann LastName:Carraway Grade:79.59 Age:23 Alive:false Github:true}
+	// {ID:1 FirstName:Ian LastName:Lopshire Grade:99.5 Age:20 Alive:false Github:false}
+	// {ID:2 FirstName:John LastName:Doe Grade:89.5 Age:21 Alive:true Github:true}
+	// {ID:3 FirstName:Jane LastName:Doe Grade:79.5 Age:22 Alive:false Github:false}
+	// {ID:4 FirstName:Ann LastName:Carraway Grade:79.59 Age:23 Alive:false Github:true}
 }
 
 func TestUnmarshal(t *testing.T) {
@@ -536,6 +536,78 @@ func TestLineSeparator(t *testing.T) {
 				t.Errorf("Unmarshal() want %+v, have %+v", tt.expected, tt.target)
 			}
 
+		})
+	}
+}
+
+func TestDecode_Nested(t *testing.T) {
+	type Nested struct {
+		First  string `fixed:"1,3"`
+		Second string `fixed:"4,6"`
+	}
+
+	type Test struct {
+		Nested Nested `fixed:"1,6,none"`
+	}
+
+	for _, tt := range []struct {
+		name string
+		raw  []byte
+
+		expected Test
+	}{
+		{
+			name: "ascii no trimming needed",
+			raw:  []byte("123ABC\n"),
+			expected: Test{
+				Nested: Nested{
+					First:  "123",
+					Second: "ABC",
+				},
+			},
+		},
+		{
+			name: "ascii with trimmed values",
+			raw:  []byte(" 12BC\n"),
+			expected: Test{
+				Nested: Nested{
+					First:  "12",
+					Second: "BC",
+				},
+			},
+		},
+		{
+			name: "Multi-byte no trimming needed",
+			raw:  []byte("12☃☃BC\n"),
+			expected: Test{
+				Nested: Nested{
+					First:  "12☃",
+					Second: "☃BC",
+				},
+			},
+		},
+		{
+			name: "Multi-byte with trimmed values",
+			raw:  []byte(" ☃2B☃\n"),
+			expected: Test{
+				Nested: Nested{
+					First:  "☃2",
+					Second: "B☃",
+				},
+			},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			d := NewDecoder(bytes.NewReader(tt.raw))
+			d.SetUseCodepointIndices(true)
+			var s Test
+			err := d.Decode(&s)
+			if err != nil {
+				t.Errorf("Unexpected err: %v", err)
+			}
+			if !reflect.DeepEqual(tt.expected, s) {
+				t.Errorf("Decode(%v) want %v, have %v", tt.raw, tt.expected, s)
+			}
 		})
 	}
 }

@@ -196,7 +196,7 @@ func (d *Decoder) readLine(v reflect.Value) (err error, ok bool) {
 	return valueSetter(v, rawValue), true
 }
 
-func rawValueFromLine(value rawValue, startPos, endPos int, format format) rawValue {
+func rawValueFromLine(value rawValue, startPos, endPos int, format format) (rawValue, error) {
 	var trimFunc func(string) string
 
 	switch format.alignment {
@@ -218,7 +218,7 @@ func rawValueFromLine(value rawValue, startPos, endPos int, format format) rawVa
 
 	if value.codepointIndices != nil {
 		if len(value.codepointIndices) == 0 || startPos > len(value.codepointIndices) {
-			return rawValue{data: ""}
+			return rawValue{data: ""}, nil
 		}
 		var relevantIndices []int
 		var lineData string
@@ -229,20 +229,30 @@ func rawValueFromLine(value rawValue, startPos, endPos int, format format) rawVa
 			relevantIndices = value.codepointIndices[startPos-1 : endPos]
 			lineData = value.data[relevantIndices[0]:value.codepointIndices[endPos]]
 		}
-		return rawValue{
-			data:             trimFunc(lineData),
-			codepointIndices: relevantIndices,
+
+		trimmed := trimFunc(lineData)
+
+		// If the value was trimmed or didn't start at the first codepoint, the indices
+		// will be incorrect. Create a new rawValue to get the correct indices.
+		if len(trimmed) != len(lineData) || len(relevantIndices) == 0 {
+			return newRawValue(trimmed, true)
 		}
+
+		return rawValue{
+			data:             lineData,
+			codepointIndices: relevantIndices,
+		}, nil
+
 	} else {
 		if len(value.data) == 0 || startPos > len(value.data) {
-			return rawValue{data: ""}
+			return rawValue{data: ""}, nil
 		}
 		if endPos > len(value.data) {
 			endPos = len(value.data)
 		}
 		return rawValue{
 			data: trimFunc(value.data[startPos-1 : endPos]),
-		}
+		}, nil
 	}
 }
 
@@ -288,9 +298,12 @@ func structSetter(t reflect.Type) valueSetter {
 			if !fieldSpec.ok {
 				continue
 			}
-			rawValue := rawValueFromLine(raw, fieldSpec.startPos, fieldSpec.endPos, fieldSpec.format)
-			err := fieldSpec.setter(v.Field(i), rawValue)
+
+			rawValue, err := rawValueFromLine(raw, fieldSpec.startPos, fieldSpec.endPos, fieldSpec.format)
 			if err != nil {
+				return err
+			}
+			if err := fieldSpec.setter(v.Field(i), rawValue); err != nil {
 				sf := t.Field(i)
 				return &UnmarshalTypeError{raw.data, sf.Type, t.Name(), sf.Name, err}
 			}
