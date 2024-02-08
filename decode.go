@@ -207,6 +207,8 @@ func rawValueFromLine(value rawValue, startPos, endPos int, format format) rawVa
 		trimFunc = func(r rawValue) rawValue {
 			return r.trimLeft(string(format.padChar))
 		}
+	case alignmentNone:
+		trimFunc = func(r rawValue) rawValue { return r }
 	default:
 		trimFunc = func(r rawValue) rawValue {
 			return r.trim(string(format.padChar))

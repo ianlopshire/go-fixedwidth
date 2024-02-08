@@ -386,7 +386,7 @@ func TestDecodeSetUseCodepointIndices(t *testing.T) {
 
 }
 
-func TestDecodeSetUseCodepointIndices_Nested(t *testing.T) {
+func TestDecode_Nested(t *testing.T) {
 	type Nested struct {
 		First  string `fixed:"1,3"`
 		Second string `fixed:"4,6"`
@@ -394,9 +394,9 @@ func TestDecodeSetUseCodepointIndices_Nested(t *testing.T) {
 
 	type Test struct {
 		First  string `fixed:"1,3"`
-		Second Nested `fixed:"4,9"`
+		Second Nested `fixed:"4,9,none"`
 		Third  string `fixed:"10,12"`
-		Fourth Nested `fixed:"13,18"`
+		Fourth Nested `fixed:"13,18,none"`
 		Fifth  string `fixed:"19,21"`
 	}
 
@@ -417,6 +417,17 @@ func TestDecodeSetUseCodepointIndices_Nested(t *testing.T) {
 			},
 		},
 		{
+			name: "All ASCII characters with padding",
+			raw:  []byte(" 2  B  5  E  8  H  1 \n"),
+			expected: Test{
+				First:  "2",
+				Second: Nested{First: "B", Second: "5"},
+				Third:  "E",
+				Fourth: Nested{First: "8", Second: "H"},
+				Fifth:  "1",
+			},
+		},
+		{
 			name: "Multi-byte characters",
 			raw:  []byte("123x☃x456x☃x789x☃x012\n"),
 			expected: Test{
@@ -427,63 +438,15 @@ func TestDecodeSetUseCodepointIndices_Nested(t *testing.T) {
 				Fifth:  "012",
 			},
 		},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			d := NewDecoder(bytes.NewReader(tt.raw))
-			d.SetUseCodepointIndices(true)
-			var s Test
-			err := d.Decode(&s)
-			if err != nil {
-				t.Errorf("Unexpected err: %v", err)
-			}
-			if !reflect.DeepEqual(tt.expected, s) {
-				t.Errorf("Decode(%v) want %v, have %v", tt.raw, tt.expected, s)
-			}
-		})
-	}
-}
-
-func TestDecodeSetUseCodepointIndices_PaddingTrimmed(t *testing.T) {
-	type Nested struct {
-		First  int64  `fixed:"1,2,right,0"`
-		Second string `fixed:"3,4"`
-		Third  string `fixed:"5,6"`
-		Fourth string `fixed:"7,8"`
-	}
-	type Test struct {
-		First  Nested `fixed:"1,8"`
-		Second string `fixed:"9,10"`
-	}
-
-	for _, tt := range []struct {
-		name     string
-		raw      []byte
-		expected Test
-	}{
 		{
-			name: "All ASCII characters",
-			raw:  []byte("00      11"),
+			name: "Multi-byte characters with padding",
+			raw:  []byte(" ☃  Ñ  ☃  Ñ  ☃  Ñ  ☃ \n"),
 			expected: Test{
-				First: Nested{
-					First:  0,
-					Second: "",
-					Third:  "",
-					Fourth: "",
-				},
-				Second: "11",
-			},
-		},
-		{
-			name: "Multi-byte characters",
-			raw:  []byte("00      ☃☃"),
-			expected: Test{
-				First: Nested{
-					First:  0,
-					Second: "",
-					Third:  "",
-					Fourth: "",
-				},
-				Second: "☃☃",
+				First:  "☃",
+				Second: Nested{First: "Ñ", Second: "☃"},
+				Third:  "Ñ",
+				Fourth: Nested{First: "☃", Second: "Ñ"},
+				Fifth:  "☃",
 			},
 		},
 	} {
