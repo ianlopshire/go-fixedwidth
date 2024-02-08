@@ -8,7 +8,6 @@ import (
 	"io"
 	"reflect"
 	"strconv"
-	"strings"
 )
 
 var (
@@ -197,26 +196,20 @@ func (d *Decoder) readLine(v reflect.Value) (err error, ok bool) {
 }
 
 func rawValueFromLine(value rawValue, startPos, endPos int, format format) rawValue {
-	var trimFunc func(in string) (out string, leftRemoved int, rightRemoved int)
+	var trimFunc func(r rawValue) rawValue
 
 	switch format.alignment {
-	case left:
-		trimFunc = func(s string) (out string, leftRemoved int, rightRemoved int) {
-			out = strings.TrimRight(s, string(format.padChar))
-			return out, 0, len(s) - len(out)
+	case left: // Aligned left, so trim from right side.
+		trimFunc = func(r rawValue) rawValue {
+			return r.trimRight(string(format.padChar))
 		}
-	case right:
-		trimFunc = func(s string) (out string, leftRemoved int, rightRemoved int) {
-			out = strings.TrimLeft(s, string(format.padChar))
-			return out, len(s) - len(out), 0
+	case right: // Aligned right, so trim from left side.
+		trimFunc = func(r rawValue) rawValue {
+			return r.trimLeft(string(format.padChar))
 		}
 	default:
-		trimFunc = func(s string) (out string, leftRemoved int, rightRemoved int) {
-			leftTrimmed := strings.TrimLeft(s, string(format.padChar))
-			leftRemoved = len(s) - len(leftTrimmed)
-			rightTrimmed := strings.TrimRight(leftTrimmed, string(format.padChar))
-			rightRemoved = len(leftTrimmed) - len(rightTrimmed)
-			return rightTrimmed, leftRemoved, rightRemoved
+		trimFunc = func(r rawValue) rawValue {
+			return r.trim(string(format.padChar))
 		}
 	}
 
@@ -245,24 +238,7 @@ func rawValueFromLine(value rawValue, startPos, endPos int, format format) rawVa
 			}
 		}
 
-		// Trim the new line data.
-		newLineData, leftRemovedBytes, rightRemovedBytes := trimFunc(lineData)
-		trimmedIndices := newIndices
-		if leftRemovedBytes > 0 || rightRemovedBytes > 0 {
-			// We must trim our codepoint indices list in order to match
-			// the newly trimmed line data string.
-			trimmedIndices = []int{}
-			for _, idx := range newIndices {
-				if idx >= leftRemovedBytes && idx < len(lineData)-rightRemovedBytes {
-					trimmedIndices = append(trimmedIndices, idx-leftRemovedBytes)
-				}
-			}
-		}
-
-		return rawValue{
-			data:             newLineData,
-			codepointIndices: trimmedIndices,
-		}
+		return trimFunc(rawValue{data: lineData, codepointIndices: newIndices})
 	} else {
 		if len(value.data) == 0 || startPos > len(value.data) {
 			return rawValue{data: ""}
@@ -270,10 +246,7 @@ func rawValueFromLine(value rawValue, startPos, endPos int, format format) rawVa
 		if endPos > len(value.data) {
 			endPos = len(value.data)
 		}
-		newLineData, _, _ := trimFunc(value.data[startPos-1 : endPos])
-		return rawValue{
-			data: newLineData,
-		}
+		return trimFunc(rawValue{data: value.data[startPos-1 : endPos]})
 	}
 }
 
