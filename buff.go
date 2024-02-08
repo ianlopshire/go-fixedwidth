@@ -3,6 +3,7 @@ package fixedwidth
 import (
 	"bytes"
 	"errors"
+	"strings"
 	"unicode/utf8"
 )
 
@@ -181,6 +182,54 @@ type rawValue struct {
 	// mapping of codepoint indices into the bytes. So the `codepointIndices[n]` is the
 	// starting position for the n-th codepoint in `bytes`.
 	codepointIndices []int
+}
+
+func (r rawValue) trimLeft(cutset string) rawValue {
+	newData := strings.TrimLeft(r.data, cutset)
+	leftRemovedBytes := len(r.data) - len(newData)
+
+	if r.codepointIndices == nil {
+		return rawValue{data: newData}
+	}
+
+	newIndices := r.trimCodepointIndices(leftRemovedBytes, 0)
+	return rawValue{data: newData, codepointIndices: newIndices}
+}
+
+func (r rawValue) trimRight(cutset string) rawValue {
+	newData := strings.TrimRight(r.data, cutset)
+	rightRemovedBytes := len(r.data) - len(newData)
+
+	if r.codepointIndices == nil {
+		return rawValue{data: newData}
+	}
+
+	newIndices := r.trimCodepointIndices(0, rightRemovedBytes)
+	return rawValue{data: newData, codepointIndices: newIndices}
+}
+
+func (r rawValue) trim(cutset string) rawValue {
+	leftTrimmed := strings.TrimLeft(r.data, cutset)
+	leftRemovedBytes := len(r.data) - len(leftTrimmed)
+	bothTrimmed := strings.TrimRight(leftTrimmed, cutset)
+	rightRemovedBytes := len(leftTrimmed) - len(bothTrimmed)
+
+	if r.codepointIndices == nil {
+		return rawValue{data: bothTrimmed}
+	}
+
+	newIndices := r.trimCodepointIndices(leftRemovedBytes, rightRemovedBytes)
+	return rawValue{data: bothTrimmed, codepointIndices: newIndices}
+}
+
+func (r rawValue) trimCodepointIndices(leftRemovedBytes int, rightRemovedBytes int) []int {
+	newIndices := make([]int, 0, len(r.codepointIndices))
+	for _, idx := range r.codepointIndices {
+		if idx >= leftRemovedBytes && idx < len(r.data)-rightRemovedBytes {
+			newIndices = append(newIndices, idx-leftRemovedBytes)
+		}
+	}
+	return newIndices
 }
 
 func newRawValue(data string, useCodepointIndices bool) (rawValue, error) {

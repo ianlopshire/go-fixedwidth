@@ -8,7 +8,6 @@ import (
 	"io"
 	"reflect"
 	"strconv"
-	"strings"
 )
 
 var (
@@ -197,20 +196,20 @@ func (d *Decoder) readLine(v reflect.Value) (err error, ok bool) {
 }
 
 func rawValueFromLine(value rawValue, startPos, endPos int, format format) rawValue {
-	var trimFunc func(string) string
+	var trimFunc func(r rawValue) rawValue
 
 	switch format.alignment {
-	case left:
-		trimFunc = func(s string) string {
-			return strings.TrimRight(s, string(format.padChar))
+	case left: // Aligned left, so trim from right side.
+		trimFunc = func(r rawValue) rawValue {
+			return r.trimRight(string(format.padChar))
 		}
-	case right:
-		trimFunc = func(s string) string {
-			return strings.TrimLeft(s, string(format.padChar))
+	case right: // Aligned right, so trim from left side.
+		trimFunc = func(r rawValue) rawValue {
+			return r.trimLeft(string(format.padChar))
 		}
 	default:
-		trimFunc = func(s string) string {
-			return strings.Trim(s, string(format.padChar))
+		trimFunc = func(r rawValue) rawValue {
+			return r.trim(string(format.padChar))
 		}
 	}
 
@@ -227,10 +226,19 @@ func rawValueFromLine(value rawValue, startPos, endPos int, format format) rawVa
 			relevantIndices = value.codepointIndices[startPos-1 : endPos]
 			lineData = value.data[relevantIndices[0]:value.codepointIndices[endPos]]
 		}
-		return rawValue{
-			data:             trimFunc(lineData),
-			codepointIndices: relevantIndices,
+
+		newIndices := relevantIndices
+		if relevantIndices[0] > 0 {
+			// We trimmed data from the front of the string.
+			// We need to adjust the codepoint indices to reflect this, as they have shifted.
+			removedFromFront := relevantIndices[0]
+			newIndices = make([]int, 0, len(relevantIndices))
+			for _, idx := range relevantIndices {
+				newIndices = append(newIndices, idx-removedFromFront)
+			}
 		}
+
+		return trimFunc(rawValue{data: lineData, codepointIndices: newIndices})
 	} else {
 		if len(value.data) == 0 || startPos > len(value.data) {
 			return rawValue{data: ""}
@@ -238,9 +246,7 @@ func rawValueFromLine(value rawValue, startPos, endPos int, format format) rawVa
 		if endPos > len(value.data) {
 			endPos = len(value.data)
 		}
-		return rawValue{
-			data: trimFunc(value.data[startPos-1 : endPos]),
-		}
+		return trimFunc(rawValue{data: value.data[startPos-1 : endPos]})
 	}
 }
 
