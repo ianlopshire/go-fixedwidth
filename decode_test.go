@@ -443,6 +443,65 @@ func TestDecodeSetUseCodepointIndices_Nested(t *testing.T) {
 	}
 }
 
+func TestDecodeSetUseCodepointIndices_PaddingTrimmed(t *testing.T) {
+	type Nested struct {
+		First  int64  `fixed:"1,2,right,0"`
+		Second string `fixed:"3,4"`
+		Third  string `fixed:"5,6"`
+		Fourth string `fixed:"7,8"`
+	}
+	type Test struct {
+		First  Nested `fixed:"1,8"`
+		Second string `fixed:"9,10"`
+	}
+
+	for _, tt := range []struct {
+		name     string
+		raw      []byte
+		expected Test
+	}{
+		{
+			name: "All ASCII characters",
+			raw:  []byte("00      11"),
+			expected: Test{
+				First: Nested{
+					First:  0,
+					Second: "",
+					Third:  "",
+					Fourth: "",
+				},
+				Second: "11",
+			},
+		},
+		{
+			name: "Multi-byte characters",
+			raw:  []byte("00      ☃☃"),
+			expected: Test{
+				First: Nested{
+					First:  0,
+					Second: "",
+					Third:  "",
+					Fourth: "",
+				},
+				Second: "☃☃",
+			},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			d := NewDecoder(bytes.NewReader(tt.raw))
+			d.SetUseCodepointIndices(true)
+			var s Test
+			err := d.Decode(&s)
+			if err != nil {
+				t.Errorf("Unexpected err: %v", err)
+			}
+			if !reflect.DeepEqual(tt.expected, s) {
+				t.Errorf("Decode(%v) want %v, have %v", tt.raw, tt.expected, s)
+			}
+		})
+	}
+}
+
 // Verify the behavior of Decoder.Decode at the end of a file. See
 // https://github.com/ianlopshire/go-fixedwidth/issues/6 for more details.
 func TestDecode_EOF(t *testing.T) {
